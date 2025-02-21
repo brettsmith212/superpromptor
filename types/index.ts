@@ -16,4 +16,6 @@
  * - Ensures type safety and consistency across the application
  */
 
+/// <reference path="./window.d.ts" />
+
 export * from './file-types';

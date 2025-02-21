@@ -30,7 +30,7 @@
 
 import { useState } from "react"
 import { Plus, X } from "lucide-react"
-import { FileData } from "@/types"
+import type { FileData } from "@/types"
 
 interface FileSelectorProps {
   /**
@@ -44,6 +44,20 @@ interface FileSelectorProps {
    * @param files - Array of selected FileData objects
    */
   onFilesSelected: (files: FileData[]) => void
+}
+
+/**
+ * Helper function to read file contents as text
+ * @param file - File object to read
+ * @returns Promise resolving to the file contents as string
+ */
+async function readFileContents(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = () => reject(reader.error)
+    reader.readAsText(file)
+  })
 }
 
 export default function FileSelector({ id, onFilesSelected }: FileSelectorProps) {
@@ -66,11 +80,12 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
         fileHandles.map(async (handle) => {
           const file = await handle.getFile()
           const contents = await readFileContents(file)
-          return {
+          const fileData: FileData = {
             path: file.name,
             size: file.size,
             contents,
           }
+          return fileData
         })
       )
       const updatedFiles = [...files, ...newFiles]
@@ -101,20 +116,6 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
       console.error("Error selecting folder:", error)
       alert("Failed to select folder. See console for details.");
     }
-  }
-
-  /**
-   * Reads the contents of a file using FileReader.
-   * @param file - The File object to read
-   * @returns Promise<string> - The file contents as a string
-   */
-  const readFileContents = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = (e) => resolve(e.target?.result as string)
-      reader.onerror = (e) => reject(e)
-      reader.readAsText(file)
-    })
   }
 
   /**

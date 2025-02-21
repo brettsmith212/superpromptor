@@ -1,18 +1,16 @@
-"use client"
-
 /**
  * @file Template Display component for SuperPromptor
  * @description
- * This client-side component handles the upload and markdown rendering of the template
- * in the SuperPromptor application. It provides a file input for uploading `.md` files,
- * reads and stores the template content in state, and renders the template as markdown
- * using react-markdown. It replaces `<file>` tags with FileSelector buttons for file selection.
+ * This client-side component manages the upload, markdown rendering, and file selection
+ * workflow for the SuperPromptor application. It provides a file input for uploading `.md`
+ * templates, renders the template as markdown using react-markdown, and replaces `<file>`
+ * tags with interactive FileSelector buttons. It also tracks selected files for each tag.
  *
  * Key features:
  * - File input restricted to `.md` files with validation
- * - Reads and stores template content in state
- * - Renders template as markdown with custom remark plugin to handle `<file>` tags
- * - Replaces `<file>` tags with interactive FileSelector buttons
+ * - Renders template as markdown with a custom remark plugin to handle `<file>` tags
+ * - Replaces `<file>` tags with FileSelector buttons, each with a unique ID
+ * - Tracks selected files per `<file>` tag in a Map for later output generation
  * - Displays a placeholder if no template is uploaded
  *
  * @dependencies
@@ -22,14 +20,17 @@
  * - unist: For base Node type definition
  * - mdast: For markdown-specific AST node types (Parent, Text)
  * - ./file-selector: Client component for file selection buttons
- * - @/types: For FileSelectorNode type
+ * - @/types: For FileSelectorNode and FileData types
  *
  * @notes
- * - Uses a custom remark plugin to replace `<file>` tags with custom 'fileSelector' nodes
- * - Each `<file>` tag is assigned a unique ID for state management
- * - Added logging to debug `<file>` tag replacement issues
- * - Uses explicit typing for components prop to resolve TypeScript error with custom 'fileSelector'
+ * - Uses a custom remark plugin to replace `<file>` tags with 'fileSelector' nodes
+ * - Each `<file>` tag gets a unique ID for state management
+ * - File selections are stored in a Map keyed by tag ID for centralized management
+ * - Logging is included to debug AST transformations
+ * - Assumes FileSelector handles its own file selection UI
  */
+
+"use client"
 
 import { useState } from "react"
 import ReactMarkdown, { Components } from 'react-markdown'
@@ -37,7 +38,7 @@ import { visit, type BuildVisitor } from 'unist-util-visit'
 import { Node } from 'unist'
 import { Parent, Text } from 'mdast'
 import FileSelector from './file-selector'
-import { FileSelectorNode } from '@/types'
+import { FileSelectorNode, FileData } from '@/types'
 
 /**
  * Creates a remark plugin to replace `<file>` tags with custom 'fileSelector' nodes.
@@ -48,24 +49,20 @@ function createFileTagPlugin() {
   let counter = 0;
   return () => (tree: Node) => {
     console.log('Original AST:', JSON.stringify(tree, null, 2));
-    // Define the visitor with proper typing for Text nodes
     const visitor: BuildVisitor<Node, 'text'> = (
       node: Text,
       index: number | undefined,
       parent: Parent | undefined
     ) => {
-      // Ensure parent and index are defined before proceeding
       if (parent && index !== undefined && node.value.includes('<file>')) {
         console.log(`Found <file> in node: "${node.value}"`);
         const parts = node.value.split('<file>');
         const newNodes: (Text | FileSelectorNode)[] = [];
 
         parts.forEach((part: string, i: number) => {
-          // Add non-empty text parts as text nodes
           if (part) {
             newNodes.push({ type: 'text', value: part } as Text);
           }
-          // Add a fileSelector node before each <file> tag, except after the last part
           if (i < parts.length - 1) {
             counter++;
             const id = `file-${counter}`;
@@ -73,20 +70,32 @@ function createFileTagPlugin() {
             console.log(`Replaced <file> with fileSelector node, id: ${id}`);
           }
         });
-        // Replace the original text node with the new nodes; cast as any due to mdast strictness
         (parent.children as any).splice(index, 1, ...newNodes);
       }
     };
 
-    // Apply the visitor to all 'text' nodes in the tree
     visit(tree, 'text', visitor);
     console.log('Transformed AST:', JSON.stringify(tree, null, 2));
   };
 }
 
 export default function TemplateDisplay() {
-  // State to hold the uploaded template content
   const [template, setTemplate] = useState<string>("");
+  const [files, setFiles] = useState<Map<string, FileData[]>>(new Map());
+
+  /**
+   * Handles file selection from a FileSelector instance.
+   * Updates the files Map with the selected files for the given tag ID.
+   * @param tagId - The unique ID of the `<file>` tag
+   * @param selectedFiles - Array of selected FileData objects
+   */
+  const handleFilesSelected = (tagId: string, selectedFiles: FileData[]) => {
+    setFiles((prevFiles) => {
+      const newFiles = new Map(prevFiles);
+      newFiles.set(tagId, selectedFiles);
+      return newFiles;
+    });
+  };
 
   /**
    * Handles file selection, reads the content of a .md file, and updates state.
@@ -95,38 +104,39 @@ export default function TemplateDisplay() {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // Validate file extension (.md)
       if (file.name.endsWith(".md")) {
         const reader = new FileReader();
         reader.onload = (e) => {
-          // Safely cast result as string and update state
           const content = e.target?.result as string;
           setTemplate(content);
+          setFiles(new Map()); // Reset files when a new template is uploaded
         };
         reader.readAsText(file);
       } else {
         alert("Please upload a .md file");
-        event.target.value = ""; // Reset input to allow re-selection
+        event.target.value = "";
       }
     }
   };
 
-  // Create the remark plugin instance
   const fileTagPlugin = createFileTagPlugin();
 
-  // Define custom components with explicit typing to include fileSelector
+  // Define custom components with typing that matches FileSelectorProps
   const components: Components & { fileSelector?: React.FC<{ id: string }> } = {
-    fileSelector: ({ id }) => <FileSelector id={id} />,
+    fileSelector: ({ id }) => (
+      <FileSelector
+        id={id}
+        onFilesSelected={(selectedFiles) => handleFilesSelected(id, selectedFiles)}
+      />
+    ),
   };
 
   return (
     <div className="p-4">
-      {/* Accessible label for file input */}
       <label htmlFor="template-upload" className="block mb-2 text-gray-700 dark:text-gray-300">
         Upload your markdown template:
       </label>
 
-      {/* File input restricted to .md files */}
       <input
         id="template-upload"
         type="file"
@@ -135,7 +145,6 @@ export default function TemplateDisplay() {
         className="mb-4 text-gray-700 dark:text-gray-300"
       />
 
-      {/* Conditional rendering based on template state */}
       {template ? (
         <ReactMarkdown
           remarkPlugins={[fileTagPlugin]}

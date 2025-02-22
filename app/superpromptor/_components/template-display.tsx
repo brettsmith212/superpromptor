@@ -89,7 +89,7 @@ export default function TemplateDisplay() {
       }
 
       // Parse the template using regex to match only exact <file> tags
-      const regex = /<file>/g
+      const regex = /<superpromptor-file>/g
       const newSegments: Segment[] = []
       let lastIndex = 0
       let counter = 0

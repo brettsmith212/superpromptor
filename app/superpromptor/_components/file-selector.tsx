@@ -2,36 +2,41 @@
  * @file File Selector component for SuperPromptor
  * @description
  * This client-side component handles file and folder selection for the SuperPromptor application.
- * It renders as a button within the markdown template where `<file>` tags were replaced, allowing
- * users to select multiple files or a folder. Once selected, it displays the list of files with
- * options to remove them and add more.
+ * It renders as a button within the markdown template where `<file>` tags are replaced, allowing
+ * users to select multiple files or a folder. For folder selections, it displays a toggleable tree
+ * view to select specific files, showing selected files with options to remove them and add more.
  *
  * Key features:
- * - Button to select multiple files or a folder via a dropdown menu
- * - Displays selected files with their names and sizes
+ * - Button with dropdown to select multiple files or a folder
+ * - Toggleable tree view for folder selections with recursive folder navigation
+ * - Displays selected files with relative paths and sizes
  * - Allows removing individual files from the selection
- * - Plus sign button to add more files (reopens file picker or tree view)
+ * - Plus sign button to reopen the tree view or file picker
  * - Updates button text to "Change Files" after selection
  *
  * @dependencies
- * - react: For state management (useState) and event handling
+ * - react: For state management (useState, useCallback, useMemo, useEffect) and event handling
  * - lucide-react: For icons (Plus, X)
  * - @/types: For FileData type
  *
  * @notes
- * - File selection uses window.showOpenFilePicker for multiple files
- * - Folder selection uses window.showDirectoryPicker (tree view TBD)
- * - File contents are read using FileReader; streaming may be added later
- * - Checks API availability with fallbacks for unsupported browsers
- * - Notifies parent of file changes via onFilesSelected prop
+ * - Uses File System Access API (showOpenFilePicker, showDirectoryPicker) with browser compatibility checks
+ * - Tree view is recursive, fetching folder contents on expansion
+ * - Paths are relative to the root folder when set; otherwise, use file names
+ * - Allows multiple files with the same path (e.g., direct vs. folder selection); removal by path may remove all instances
+ * - Error handling includes alerts for file reading and folder entry failures
+ * - Fixed HTML nesting issue: <li> elements are not nested directly; each level uses <ul> properly
  */
 
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useMemo, useEffect } from "react"
 import { Plus, X } from "lucide-react"
 import type { FileData } from "@/types"
 
+/**
+ * Props for the FileSelector component
+ */
 interface FileSelectorProps {
   /**
    * A unique identifier for this file selector instance,
@@ -47,17 +52,41 @@ interface FileSelectorProps {
 }
 
 /**
+ * Props for the FileItem component
+ */
+interface FileItemProps {
+  handle: FileSystemFileHandle
+  path: string
+  selectedPaths: Set<string>
+  addFile: (fileData: FileData) => void
+  removeFile: (path: string) => void
+}
+
+/**
+ * Props for the FolderTreeView component
+ */
+interface FolderTreeViewProps {
+  directoryHandle: FileSystemDirectoryHandle
+  currentPath: string
+  selectedPaths: Set<string>
+  addFile: (fileData: FileData) => void
+  removeFile: (path: string) => void
+  isRoot?: boolean
+  level?: number
+}
+
+/**
  * Helper function to read file contents as text
  * @param file - File object to read
- * @returns Promise resolving to the file contents as string
+ * @returns Promise resolving to the file contents as a string
  */
 async function readFileContents(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => {
       const result = reader.result
-      if (typeof result !== 'string') {
-        reject(new Error('File content is not a string'))
+      if (typeof result !== "string") {
+        reject(new Error("File content is not a string"))
         return
       }
       resolve(result)
@@ -67,26 +96,214 @@ async function readFileContents(file: File): Promise<string> {
   })
 }
 
+/**
+ * Component to render individual files in the tree view with checkboxes
+ */
+const FileItem: React.FC<FileItemProps> = ({ handle, path, selectedPaths, addFile, removeFile }) => {
+  const isSelected = selectedPaths.has(path)
+
+  /**
+   * Handles checkbox changes, reading file contents on selection and updating state
+   */
+  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const checked = e.target.checked
+    if (checked) {
+      try {
+        const file = await handle.getFile()
+        const contents = await readFileContents(file)
+        addFile({ path, size: file.size, contents })
+      } catch (error) {
+        console.error(`Error reading file ${path}:`, error)
+        alert(`Failed to read file ${path}. Please try again.`)
+      }
+    } else {
+      removeFile(path)
+    }
+  }
+
+  return (
+    <li>
+      <label className="flex items-center">
+        <input
+          type="checkbox"
+          checked={isSelected}
+          onChange={handleChange}
+          className="mr-2"
+        />
+        {handle.name}
+      </label>
+    </li>
+  )
+}
+
+/**
+ * Recursive component to render the folder tree view
+ */
+const FolderTreeView: React.FC<FolderTreeViewProps> = ({
+  directoryHandle,
+  currentPath,
+  selectedPaths,
+  addFile,
+  removeFile,
+  isRoot = false,
+  level = 0,
+}) => {
+  const [isExpanded, setIsExpanded] = useState(isRoot)
+  const [entries, setEntries] = useState<Array<[string, FileSystemHandle]>>([])
+
+  /**
+   * Fetches folder entries when expanded
+   */
+  useEffect(() => {
+    if (isExpanded) {
+      const fetchEntries = async () => {
+        try {
+          const newEntries = []
+          for await (const entry of directoryHandle.entries()) {
+            newEntries.push(entry)
+          }
+          // Sort: folders first, then files, alphabetically
+          newEntries.sort((a, b) => {
+            if (a[1].kind === "directory" && b[1].kind === "file") return -1
+            if (a[1].kind === "file" && b[1].kind === "directory") return 1
+            return a[0].localeCompare(b[0])
+          })
+          setEntries(newEntries)
+        } catch (error) {
+          console.error(`Error fetching entries for ${directoryHandle.name}:`, error)
+          alert(`Failed to fetch folder contents for ${directoryHandle.name}. Please try again.`)
+        }
+      }
+      fetchEntries()
+    }
+  }, [isExpanded, directoryHandle])
+
+  return (
+    <div style={{ paddingLeft: isRoot ? 0 : 20 }}>
+      {!isRoot && (
+        <>
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="text-blue-500 hover:text-blue-700"
+          >
+            {isExpanded ? "-" : "+"} {directoryHandle.name}
+          </button>
+          {isExpanded && entries.length > 0 && (
+            <ul className="list-none">
+              {entries.map(([name, handle]) =>
+                handle.kind === "directory" ? (
+                  <li key={name}>
+                    <FolderTreeView
+                      directoryHandle={handle as FileSystemDirectoryHandle}
+                      currentPath={currentPath + name + "/"}
+                      selectedPaths={selectedPaths}
+                      addFile={addFile}
+                      removeFile={removeFile}
+                      level={level + 1}
+                    />
+                  </li>
+                ) : (
+                  <FileItem
+                    key={name}
+                    handle={handle as FileSystemFileHandle}
+                    path={currentPath + name}
+                    selectedPaths={selectedPaths}
+                    addFile={addFile}
+                    removeFile={removeFile}
+                  />
+                )
+              )}
+            </ul>
+          )}
+        </>
+      )}
+      {isRoot && entries.length > 0 && (
+        <ul className="list-none">
+          {entries.map(([name, handle]) =>
+            handle.kind === "directory" ? (
+              <li key={name}>
+                <FolderTreeView
+                  directoryHandle={handle as FileSystemDirectoryHandle}
+                  currentPath={currentPath + name + "/"}
+                  selectedPaths={selectedPaths}
+                  addFile={addFile}
+                  removeFile={removeFile}
+                  level={level + 1}
+                />
+              </li>
+            ) : (
+              <FileItem
+                key={name}
+                handle={handle as FileSystemFileHandle}
+                path={currentPath + name}
+                selectedPaths={selectedPaths}
+                addFile={addFile}
+                removeFile={removeFile}
+              />
+            )
+          )}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+/**
+ * Main FileSelector component
+ */
 export default function FileSelector({ id, onFilesSelected }: FileSelectorProps) {
   const [files, setFiles] = useState<FileData[]>([])
   const [rootFolder, setRootFolder] = useState<FileSystemDirectoryHandle | null>(null)
   const [showMenu, setShowMenu] = useState(false)
+  const [showTreeView, setShowTreeView] = useState(false)
 
   /**
    * Updates both local state and parent with new files
    */
-  const updateFiles = useCallback((newFiles: FileData[]) => {
-    setFiles(newFiles)
-    onFilesSelected(newFiles)
-  }, [onFilesSelected])
+  const updateFiles = useCallback(
+    (newFiles: FileData[]) => {
+      setFiles(newFiles)
+      onFilesSelected(newFiles)
+    },
+    [onFilesSelected]
+  )
 
   /**
-   * Handles the selection of multiple files using window.showOpenFilePicker.
-   * Reads file contents and updates the state with new files.
+   * Adds a file to the selection, allowing duplicates
+   */
+  const addFile = useCallback(
+    (fileData: FileData) => {
+      const newFiles = [...files, fileData]
+      updateFiles(newFiles)
+    },
+    [files, updateFiles]
+  )
+
+  /**
+   * Removes all files with the specified path
+   * Note: May remove multiple instances if paths are duplicated (e.g., direct vs. folder selection)
+   */
+  const removeFile = useCallback(
+    (path: string) => {
+      const newFiles = files.filter((f) => f.path !== path)
+      updateFiles(newFiles)
+    },
+    [files, updateFiles]
+  )
+
+  /**
+   * Memoized set of selected file paths for efficient lookup
+   */
+  const selectedPaths = useMemo(() => new Set(files.map((f) => f.path)), [files])
+
+  /**
+   * Handles multiple file selection using showOpenFilePicker
    */
   const handleSelectFiles = async () => {
     if (!window.showOpenFilePicker) {
-      alert("File System Access API is not supported in this browser. Please use a supported browser like Chrome or Edge.")
+      alert(
+        "File System Access API is not supported in this browser. Please use a supported browser like Chrome or Edge."
+      )
       return
     }
     try {
@@ -96,7 +313,7 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
           const file = await handle.getFile()
           const contents = await readFileContents(file)
           const fileData: FileData = {
-            path: file.name, // Will be updated to relative path in future steps
+            path: file.name, // Direct selection uses file name only
             size: file.size,
             contents,
           }
@@ -113,21 +330,20 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
   }
 
   /**
-   * Handles the selection of a folder using window.showDirectoryPicker.
-   * Sets the root folder and prepares for tree view display.
-   * (Tree view logic to be implemented in a future step)
+   * Handles folder selection, setting root folder and showing tree view
    */
   const handleSelectFolder = async () => {
     if (!window.showDirectoryPicker) {
-      alert("File System Access API is not supported in this browser. Please use a supported browser like Chrome or Edge.")
+      alert(
+        "File System Access API is not supported in this browser. Please use a supported browser like Chrome or Edge."
+      )
       return
     }
     try {
       const folderHandle = await window.showDirectoryPicker()
       setRootFolder(folderHandle)
+      setShowTreeView(true)
       console.log(`Folder selected for selector ${id}:`, folderHandle.name)
-      // TODO: Implement tree view to select files within the folder
-      alert("Folder selection is not fully implemented yet. Please select files directly for now.")
     } catch (error) {
       console.error(`Error selecting folder for selector ${id}:`, error)
       alert("Failed to select folder. Please try again or check console for details.")
@@ -135,19 +351,16 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
   }
 
   /**
-   * Removes a file from the selected files list.
-   * @param index - The index of the file to remove
+   * Removes a file by index from the displayed list
    */
-  const removeFile = (index: number) => {
+  const removeFileByIndex = (index: number) => {
     const updatedFiles = files.filter((_, i) => i !== index)
     updateFiles(updatedFiles)
     console.log(`Removed file at index ${index} for selector ${id}. New files:`, updatedFiles)
   }
 
   /**
-   * Formats the file size in a human-readable format (e.g., 1.2 MB).
-   * @param size - The file size in bytes
-   * @returns string - The formatted file size
+   * Formats file size in a human-readable format
    */
   const formatFileSize = (size: number): string => {
     if (size < 1024) return `${size} B`
@@ -157,7 +370,7 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
 
   return (
     <div className="inline-block relative">
-      {/* Button to trigger selection menu */}
+      {/* Selection button */}
       <button
         onClick={() => setShowMenu(!showMenu)}
         className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
@@ -165,7 +378,7 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
         {files.length > 0 ? "Change Files" : "Select Files"}
       </button>
 
-      {/* Dropdown menu for selection options */}
+      {/* Dropdown menu */}
       {showMenu && (
         <div className="absolute z-10 bg-white dark:bg-gray-800 shadow-md rounded mt-2">
           <button
@@ -189,17 +402,43 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
         </div>
       )}
 
-      {/* List of selected files */}
+      {/* Tree view */}
+      {showTreeView && rootFolder && (
+        <div className="mt-2 p-4 border rounded">
+          <div className="flex justify-between items-center mb-2">
+            <h3 className="text-lg font-semibold">Select files from {rootFolder.name}</h3>
+            <button
+              onClick={() => setShowTreeView(false)}
+              className="text-red-500 hover:text-red-700"
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <FolderTreeView
+            directoryHandle={rootFolder}
+            currentPath=""
+            selectedPaths={selectedPaths}
+            addFile={addFile}
+            removeFile={removeFile}
+            isRoot={true}
+          />
+        </div>
+      )}
+
+      {/* File list */}
       {files.length > 0 && (
         <div className="mt-2">
           <ul className="list-disc pl-5">
             {files.map((file, index) => (
-              <li key={`${file.path}-${index}`} className="flex items-center justify-between mb-1">
+              <li
+                key={`${file.path}-${index}`}
+                className="flex items-center justify-between mb-1"
+              >
                 <span className="text-gray-700 dark:text-gray-300">
                   {file.path} ({formatFileSize(file.size)})
                 </span>
                 <button
-                  onClick={() => removeFile(index)}
+                  onClick={() => removeFileByIndex(index)}
                   className="ml-2 text-red-500 hover:text-red-700 transition-colors"
                   aria-label={`Remove ${file.path}`}
                 >
@@ -208,13 +447,10 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
               </li>
             ))}
           </ul>
-          {/* Plus sign to add more files */}
           <button
             onClick={() => {
               if (rootFolder) {
-                // TODO: Reopen tree view for folder (future step)
-                console.log(`Reopen tree view for folder for selector ${id}`)
-                alert("Folder tree view is not implemented yet. Please select files directly.")
+                setShowTreeView(true)
               } else {
                 handleSelectFiles()
               }

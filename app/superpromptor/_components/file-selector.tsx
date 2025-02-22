@@ -28,7 +28,7 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useCallback } from "react"
 import { Plus, X } from "lucide-react"
 import type { FileData } from "@/types"
 
@@ -72,11 +72,13 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
   const [rootFolder, setRootFolder] = useState<FileSystemDirectoryHandle | null>(null)
   const [showMenu, setShowMenu] = useState(false)
 
-  // Update parent when files change, with stable onFilesSelected
-  useEffect(() => {
-    console.log(`FileSelector ${id} notifying parent with files:`, files)
-    onFilesSelected(files)
-  }, [files, id, onFilesSelected]) // onFilesSelected is memoized in parent
+  /**
+   * Updates both local state and parent with new files
+   */
+  const updateFiles = useCallback((newFiles: FileData[]) => {
+    setFiles(newFiles)
+    onFilesSelected(newFiles)
+  }, [onFilesSelected])
 
   /**
    * Handles the selection of multiple files using window.showOpenFilePicker.
@@ -102,9 +104,8 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
           return fileData
         })
       )
-      const updatedFiles = [...files, ...newFiles]
-      setFiles(updatedFiles)
-      console.log(`Files updated for selector ${id}:`, updatedFiles)
+      updateFiles([...files, ...newFiles])
+      console.log(`Files updated for selector ${id}:`, [...files, ...newFiles])
     } catch (error) {
       console.error(`Error selecting files for selector ${id}:`, error)
       alert("Failed to select files. Please try again or check console for details.")
@@ -139,7 +140,7 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
    */
   const removeFile = (index: number) => {
     const updatedFiles = files.filter((_, i) => i !== index)
-    setFiles(updatedFiles)
+    updateFiles(updatedFiles)
     console.log(`Removed file at index ${index} for selector ${id}. New files:`, updatedFiles)
   }
 

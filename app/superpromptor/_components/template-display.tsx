@@ -28,6 +28,7 @@
 
 "use client"
 
+import React from 'react'
 import { useState, useCallback } from "react"
 import ReactMarkdown from 'react-markdown'
 import FileSelector from './file-selector'
@@ -49,18 +50,31 @@ export default function TemplateDisplay() {
   /**
    * Handles file selection from a FileSelector instance.
    * Updates the files Map with the selected files for the given tag ID.
-   * Memoized to prevent unnecessary re-renders in FileSelector.
    * @param tagId - The unique ID of the `<file>` tag
    * @param selectedFiles - Array of selected FileData objects
    */
   const handleFilesSelected = useCallback((tagId: string, selectedFiles: FileData[]) => {
-    setFiles((prevFiles) => {
+    setFiles(prevFiles => {
+      // Only update if the files have actually changed
+      const prevTagFiles = prevFiles.get(tagId) || []
+      if (JSON.stringify(prevTagFiles) === JSON.stringify(selectedFiles)) {
+        return prevFiles
+      }
+      
       const newFiles = new Map(prevFiles)
       newFiles.set(tagId, selectedFiles)
       console.log(`Updated files for tag ${tagId}:`, selectedFiles)
       return newFiles
     })
-  }, []) // Empty dependency array since it doesn’t depend on external state
+  }, [])
+
+  /**
+   * Creates a memoized file selection handler for a specific tag ID.
+   * @param tagId - The unique ID of the file tag
+   */
+  const createFileSelectionHandler = useCallback((tagId: string) => {
+    return (files: FileData[]) => handleFilesSelected(tagId, files)
+  }, [handleFilesSelected])
 
   /**
    * Handles file selection, reads the content of a .md file, parses it into segments,
@@ -137,9 +151,9 @@ export default function TemplateDisplay() {
   /**
    * Renders the parsed segments as a mix of markdown and FileSelector components.
    * This is a pure function with no state updates to prevent re-render loops.
-   * @returns JSX.Element[] - Array of rendered elements
+   * @returns Array of rendered elements
    */
-  const renderTemplate = (): JSX.Element[] => {
+  const renderTemplate = useCallback(() => {
     return segments.map((segment, index) => {
       if (segment.type === 'markdown') {
         return (
@@ -150,18 +164,18 @@ export default function TemplateDisplay() {
             {segment.content!}
           </ReactMarkdown>
         )
-      } else if (segment.type === 'fileSelector') {
-        return (
-          <FileSelector
-            key={segment.id}
-            id={segment.id!}
-            onFilesSelected={handleFilesSelected}
-          />
-        )
       }
-      return null // Should never happen due to type safety
+      // Must be fileSelector due to type safety
+      const onFilesSelected = createFileSelectionHandler(segment.id!)
+      return (
+        <FileSelector
+          key={segment.id}
+          id={segment.id!}
+          onFilesSelected={onFilesSelected}
+        />
+      )
     })
-  }
+  }, [segments, createFileSelectionHandler])
 
   return (
     <div className="p-4">

@@ -5,6 +5,7 @@
  * It renders as a button within the markdown template where `<file>` tags are replaced, allowing
  * users to select multiple files or a folder. For folder selections, it displays a toggleable tree
  * view to select specific files, showing selected files with options to remove them and add more.
+ * It includes logic to warn users about large files (>10MB) and ask for confirmation before inclusion.
  *
  * Key features:
  * - Button with dropdown to select multiple files or a folder
@@ -13,11 +14,14 @@
  * - Allows removing individual files from the selection
  * - Plus sign button to reopen the tree view or file picker
  * - Updates button text to "Change Files" after selection
+ * - Shows confirmation dialog for files larger than 10MB before inclusion
  *
  * @dependencies
  * - react: For state management (useState, useCallback, useMemo, useEffect) and event handling
  * - lucide-react: For icons (Plus, X)
  * - @/types: For FileData type
+ * - @/components/ui/dialog: For confirmation dialog (Shadcn UI)
+ * - @/components/ui/button: For dialog buttons (Shadcn UI)
  *
  * @notes
  * - Uses File System Access API (showOpenFilePicker, showDirectoryPicker) with browser compatibility checks
@@ -25,7 +29,7 @@
  * - Paths are relative to the root folder when set; otherwise, use file names
  * - Allows multiple files with the same path (e.g., direct vs. folder selection); removal by path may remove all instances
  * - Error handling includes alerts for file reading and folder entry failures
- * - Fixed HTML nesting issue: <li> elements are not nested directly; each level uses <ul> properly
+ * - Large file warnings are handled via a confirmation dialog using Shadcn UI components
  */
 
 "use client"
@@ -33,6 +37,8 @@
 import { useState, useCallback, useMemo, useEffect } from "react"
 import { Plus, X } from "lucide-react"
 import type { FileData } from "@/types"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Button } from "@/components/ui/button"
 
 /**
  * Props for the FileSelector component
@@ -60,6 +66,7 @@ interface FileItemProps {
   selectedPaths: Set<string>
   addFile: (fileData: FileData) => void
   removeFile: (path: string) => void
+  confirmLargeFile: (file: File) => Promise<boolean>
 }
 
 /**
@@ -73,6 +80,7 @@ interface FolderTreeViewProps {
   removeFile: (path: string) => void
   isRoot?: boolean
   level?: number
+  confirmLargeFile: (file: File) => Promise<boolean>
 }
 
 /**
@@ -99,22 +107,38 @@ async function readFileContents(file: File): Promise<string> {
 /**
  * Component to render individual files in the tree view with checkboxes
  */
-const FileItem: React.FC<FileItemProps> = ({ handle, path, selectedPaths, addFile, removeFile }) => {
+const FileItem: React.FC<FileItemProps> = ({
+  handle,
+  path,
+  selectedPaths,
+  addFile,
+  removeFile,
+  confirmLargeFile,
+}) => {
   const isSelected = selectedPaths.has(path)
 
   /**
-   * Handles checkbox changes, reading file contents on selection and updating state
+   * Handles checkbox changes, checking file size and reading contents only if confirmed
    */
   const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const checked = e.target.checked
     if (checked) {
       try {
         const file = await handle.getFile()
-        const contents = await readFileContents(file)
-        addFile({ path, size: file.size, contents })
+        let include = true
+        if (file.size > 10 * 1024 * 1024) {
+          include = await confirmLargeFile(file)
+        }
+        if (include) {
+          const contents = await readFileContents(file)
+          addFile({ path, size: file.size, contents })
+        } else {
+          // If not included, ensure the checkbox is unchecked
+          e.target.checked = false
+        }
       } catch (error) {
-        console.error(`Error reading file ${path}:`, error)
-        alert(`Failed to read file ${path}. Please try again.`)
+        console.error(`Error processing file ${path}:`, error)
+        alert(`Failed to process file ${path}. Please try again.`)
       }
     } else {
       removeFile(path)
@@ -147,6 +171,7 @@ const FolderTreeView: React.FC<FolderTreeViewProps> = ({
   removeFile,
   isRoot = false,
   level = 0,
+  confirmLargeFile,
 }) => {
   const [isExpanded, setIsExpanded] = useState(isRoot)
   const [entries, setEntries] = useState<Array<[string, FileSystemHandle]>>([])
@@ -200,6 +225,7 @@ const FolderTreeView: React.FC<FolderTreeViewProps> = ({
                       addFile={addFile}
                       removeFile={removeFile}
                       level={level + 1}
+                      confirmLargeFile={confirmLargeFile}
                     />
                   </li>
                 ) : (
@@ -210,6 +236,7 @@ const FolderTreeView: React.FC<FolderTreeViewProps> = ({
                     selectedPaths={selectedPaths}
                     addFile={addFile}
                     removeFile={removeFile}
+                    confirmLargeFile={confirmLargeFile}
                   />
                 )
               )}
@@ -229,6 +256,7 @@ const FolderTreeView: React.FC<FolderTreeViewProps> = ({
                   addFile={addFile}
                   removeFile={removeFile}
                   level={level + 1}
+                  confirmLargeFile={confirmLargeFile}
                 />
               </li>
             ) : (
@@ -239,6 +267,7 @@ const FolderTreeView: React.FC<FolderTreeViewProps> = ({
                 selectedPaths={selectedPaths}
                 addFile={addFile}
                 removeFile={removeFile}
+                confirmLargeFile={confirmLargeFile}
               />
             )
           )}
@@ -256,6 +285,9 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
   const [rootFolder, setRootFolder] = useState<FileSystemDirectoryHandle | null>(null)
   const [showMenu, setShowMenu] = useState(false)
   const [showTreeView, setShowTreeView] = useState(false)
+  const [showingConfirmation, setShowingConfirmation] = useState(false)
+  const [confirmFile, setConfirmFile] = useState<File | null>(null)
+  const [resolveConfirm, setResolveConfirm] = useState<((value: boolean) => void) | null>(null)
 
   /**
    * Updates both local state and parent with new files
@@ -297,6 +329,19 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
   const selectedPaths = useMemo(() => new Set(files.map((f) => f.path)), [files])
 
   /**
+   * Prompts user to confirm inclusion of a large file (>10MB)
+   * @param file - The file to confirm
+   * @returns Promise resolving to true if included, false otherwise
+   */
+  const confirmLargeFile = (file: File): Promise<boolean> => {
+    return new Promise((resolve) => {
+      setConfirmFile(file)
+      setShowingConfirmation(true)
+      setResolveConfirm(() => resolve)
+    })
+  }
+
+  /**
    * Handles multiple file selection using showOpenFilePicker
    */
   const handleSelectFiles = async () => {
@@ -308,21 +353,18 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
     }
     try {
       const fileHandles = await window.showOpenFilePicker({ multiple: true })
-      const newFiles = await Promise.all(
-        fileHandles.map(async (handle) => {
-          const file = await handle.getFile()
+      for (const handle of fileHandles) {
+        const file = await handle.getFile()
+        let include = true
+        if (file.size > 10 * 1024 * 1024) {
+          include = await confirmLargeFile(file)
+        }
+        if (include) {
           const contents = await readFileContents(file)
-          const fileData: FileData = {
-            path: file.name, // Direct selection uses file name only
-            size: file.size,
-            contents,
-          }
-          console.log(`Selected file: ${file.name}, size: ${file.size} bytes`)
-          return fileData
-        })
-      )
-      updateFiles([...files, ...newFiles])
-      console.log(`Files updated for selector ${id}:`, [...files, ...newFiles])
+          const path = file.name // For direct selection, use file name
+          addFile({ path, size: file.size, contents })
+        }
+      }
     } catch (error) {
       console.error(`Error selecting files for selector ${id}:`, error)
       alert("Failed to select files. Please try again or check console for details.")
@@ -421,6 +463,7 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
             addFile={addFile}
             removeFile={removeFile}
             isRoot={true}
+            confirmLargeFile={confirmLargeFile}
           />
         </div>
       )}
@@ -461,6 +504,50 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
             <Plus size={16} />
           </button>
         </div>
+      )}
+
+      {/* Confirmation dialog for large files */}
+      {showingConfirmation && confirmFile && (
+        <Dialog
+          open={showingConfirmation}
+          onOpenChange={(open) => {
+            if (!open && resolveConfirm) {
+              resolveConfirm(false)
+              setResolveConfirm(null)
+            }
+            setShowingConfirmation(open)
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Confirm Large File Inclusion</DialogTitle>
+            </DialogHeader>
+            <p>
+              The file {confirmFile.name} is {formatFileSize(confirmFile.size)} in size, which is
+              larger than 10MB. Do you want to include it?
+            </p>
+            <DialogFooter>
+              <Button
+                onClick={() => {
+                  resolveConfirm?.(true)
+                  setResolveConfirm(null)
+                  setShowingConfirmation(false)
+                }}
+              >
+                Include
+              </Button>
+              <Button
+                onClick={() => {
+                  resolveConfirm?.(false)
+                  setResolveConfirm(null)
+                  setShowingConfirmation(false)
+                }}
+              >
+                Exclude
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       )}
     </div>
   )

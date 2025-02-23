@@ -2,7 +2,7 @@
  * @file File Selector component for SuperPromptor
  * @description
  * This client-side component handles file and folder selection for the SuperPromptor application.
- * It renders as a button within the markdown template where `<file>` tags are replaced, allowing
+ * It renders as a button within the markdown template where `<superpromptor-file>` tags are replaced, allowing
  * users to select multiple files or a folder. For folder selections, it displays a toggleable tree
  * view to select specific files, showing selected files with options to remove them and add more.
  * It includes logic to warn users about large files (>10MB) and ask for confirmation before inclusion.
@@ -28,7 +28,7 @@
  * - Tree view is recursive, fetching folder contents on expansion
  * - Paths are relative to the root folder when set; otherwise, use file names
  * - Allows multiple files with the same path (e.g., direct vs. folder selection); removal by path may remove all instances
- * - Error handling includes alerts for file reading and folder entry failures
+ * - Error handling silently ignores AbortError for user cancellations, alerts for other issues
  * - Large file warnings are handled via a confirmation dialog using Shadcn UI components
  */
 
@@ -46,7 +46,7 @@ import { Button } from "@/components/ui/button"
 interface FileSelectorProps {
   /**
    * A unique identifier for this file selector instance,
-   * corresponding to a specific `<file>` tag in the template.
+   * corresponding to a specific `<superpromptor-file>` tag in the template.
    */
   id: string
 
@@ -343,6 +343,7 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
 
   /**
    * Handles multiple file selection using showOpenFilePicker
+   * Silently ignores AbortError if the user cancels the file picker
    */
   const handleSelectFiles = async () => {
     if (!window.showOpenFilePicker) {
@@ -365,7 +366,12 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
           addFile({ path, size: file.size, contents })
         }
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === "AbortError") {
+        // User canceled the file picker; silently ignore with no feedback
+        return
+      }
+      // Log and alert only for non-cancellation errors
       console.error(`Error selecting files for selector ${id}:`, error)
       alert("Failed to select files. Please try again or check console for details.")
     }
@@ -373,6 +379,7 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
 
   /**
    * Handles folder selection, setting root folder and showing tree view
+   * Silently ignores AbortError if the user cancels the folder picker
    */
   const handleSelectFolder = async () => {
     if (!window.showDirectoryPicker) {
@@ -386,7 +393,12 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
       setRootFolder(folderHandle)
       setShowTreeView(true)
       console.log(`Folder selected for selector ${id}:`, folderHandle.name)
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === "AbortError") {
+        // User canceled the folder picker; silently ignore with no feedback
+        return
+      }
+      // Log and alert only for non-cancellation errors
       console.error(`Error selecting folder for selector ${id}:`, error)
       alert("Failed to select folder. Please try again or check console for details.")
     }

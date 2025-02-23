@@ -30,7 +30,7 @@
  * - Stores FileSystemFileHandle for refresh functionality when available
  * - Falls back to prompting re-upload in browsers without File System Access API
  * - Buttons are styled with Tailwind per the design system
- * - Error handling covers file reading failures and invalid file types
+ * - Error handling covers file reading failures and invalid file types; silently ignores AbortError for user cancellations
  * - Alert animations require AnimatePresence in the parent component
  * - Refreshing reloads the template but preserves selected files, per user preference, with a success alert
  */
@@ -123,6 +123,7 @@ export default function TemplateDisplay() {
 
   /**
    * Handles template upload using showOpenFilePicker if available, or triggers file input.
+   * Silently ignores AbortError if the user cancels the file picker.
    */
   const handleUpload = async () => {
     if (window.showOpenFilePicker) {
@@ -144,7 +145,12 @@ export default function TemplateDisplay() {
         parseAndSetSegments(content)
         setTemplateHandle(handle)
         setFiles(new Map())
-      } catch (error) {
+      } catch (error: any) {
+        if (error.name === "AbortError") {
+          // User canceled the file picker; silently ignore with no feedback
+          return
+        }
+        // Log and alert only for non-cancellation errors
         console.error("Error selecting template:", error)
         setAlertMessage("Failed to upload template. Please try again.")
       }
@@ -159,7 +165,7 @@ export default function TemplateDisplay() {
    */
   const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file) return
+    if (!file) return // User canceled the file input
 
     if (!file.name.endsWith(".md")) {
       setAlertMessage("Please upload a .md file")

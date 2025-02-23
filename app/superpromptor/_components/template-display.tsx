@@ -5,20 +5,20 @@
  * and template management workflow for the SuperPromptor application. It allows users
  * to upload a .md template, parses it into segments with `<superpromptor-file>` tags replaced by
  * FileSelector components, renders the result, and provides "Refresh", "Remove", and "Copy Contents To Clipboard"
- * buttons to manage the template and generate the final output.
+ * buttons to manage the template and generate the final output. State is managed using useReducer for scalability.
  *
  * Key features:
  * - Uploads .md templates using showOpenFilePicker or <input type="file"> fallback
  * - Parses template to replace exact `<superpromptor-file>` tags with FileSelector components
  * - Renders markdown segments with file selection buttons
- * - Tracks selected files per `<superpromptor-file>` tag in a Map
- * - Provides "Refresh" button to reload the template from the filesystem, preserving selected files, with a "Template Refreshed" alert
+ * - Tracks selected files per `<superpromptor-file>` tag in a Map using a reducer
+ * - Provides "Refresh" button to reload the template from the filesystem, clearing files after confirmation
  * - Provides "Remove" button to reset the app state with a "Template Removed" alert
  * - Provides "Copy Contents To Clipboard" button to generate and copy the combined output
  * - Displays a disappearing alert for user feedback (e.g., "Template Refreshed", "Template Removed", "Copied to clipboard")
  *
  * @dependencies
- * - react: For state (useState, useCallback, useRef) and event handling
+ * - react: For state (useState, useCallback, useRef, useReducer) and event handling
  * - react-markdown: For rendering markdown segments
  * - ./file-selector: Client component for file selection buttons
  * - @/types: For FileData type
@@ -32,12 +32,12 @@
  * - Buttons are styled with Tailwind per the design system
  * - Error handling covers file reading failures and invalid file types; silently ignores AbortError for user cancellations
  * - Alert animations require AnimatePresence in the parent component
- * - Refreshing reloads the template but preserves selected files, per user preference, with a success alert
+ * - Refreshing now clears files with a confirmation prompt, aligning with project requirements
  */
 
 "use client"
 
-import React, { useState, useCallback, useRef } from "react"
+import React, { useState, useCallback, useRef, useReducer } from "react"
 import ReactMarkdown from "react-markdown"
 import FileSelector from "./file-selector"
 import { FileData } from "@/types"
@@ -53,42 +53,58 @@ interface Segment {
   id?: string     // For fileSelector segments
 }
 
+// Reducer types and functions
+type Action =
+  | { type: "SET_SEGMENTS"; payload: Segment[] }
+  | { type: "SET_FILES"; payload: { tagId: string; files: FileData[] } }
+  | { type: "CLEAR_FILES" }
+  | { type: "RESET_STATE" }
+
+interface State {
+  segments: Segment[]
+  files: Map<string, FileData[]>
+}
+
+const initialState: State = {
+  segments: [],
+  files: new Map(),
+}
+
+/**
+ * Reducer function to manage template segments and file selections.
+ * @param state - Current state of segments and files
+ * @param action - Action to perform on the state
+ * @returns New state based on the action
+ */
+function reducer(state: State, action: Action): State {
+  switch (action.type) {
+    case "SET_SEGMENTS":
+      return { ...state, segments: action.payload }
+    case "SET_FILES":
+      const newFiles = new Map(state.files)
+      newFiles.set(action.payload.tagId, action.payload.files)
+      return { ...state, files: newFiles }
+    case "CLEAR_FILES":
+      return { ...state, files: new Map() }
+    case "RESET_STATE":
+      return initialState
+    default:
+      return state
+  }
+}
+
 export default function TemplateDisplay() {
+  const [state, dispatch] = useReducer(reducer, initialState)
   const [templateHandle, setTemplateHandle] = useState<FileSystemFileHandle | null>(null)
-  const [segments, setSegments] = useState<Segment[]>([])
-  const [files, setFiles] = useState<Map<string, FileData[]>>(new Map())
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   /**
-   * Handles file selection from a FileSelector instance.
-   * Updates the files Map with the selected files for the given tag ID.
-   * @param tagId - The unique ID of the `<superpromptor-file>` tag
-   * @param selectedFiles - Array of selected FileData objects
-   */
-  const handleFilesSelected = useCallback((tagId: string, selectedFiles: FileData[]) => {
-    setFiles((prevFiles) => {
-      const newFiles = new Map(prevFiles)
-      newFiles.set(tagId, selectedFiles)
-      return newFiles
-    })
-  }, [])
-
-  /**
-   * Creates a memoized file selection handler for a specific tag ID.
-   * @param tagId - The unique ID of the file tag
-   * @returns Function to handle file selections for this tag
-   */
-  const createFileSelectionHandler = useCallback(
-    (tagId: string) => (files: FileData[]) => handleFilesSelected(tagId, files),
-    [handleFilesSelected]
-  )
-
-  /**
    * Parses the template content into segments of markdown and file selectors.
    * @param content - The raw markdown template content
+   * @returns Array of Segment objects
    */
-  const parseAndSetSegments = (content: string) => {
+  const parseTemplate = (content: string): Segment[] => {
     const regex = /<superpromptor-file>/g
     const newSegments: Segment[] = []
     let lastIndex = 0
@@ -118,8 +134,34 @@ export default function TemplateDisplay() {
       })
     }
 
-    setSegments(newSegments)
+    return newSegments
   }
+
+  /**
+   * Handles file selection from a FileSelector instance.
+   * Updates the files Map with the selected files for the given tag ID.
+   * @param tagId - The unique ID of the `<superpromptor-file>` tag
+   * @param selectedFiles - Array of selected FileData objects
+   */
+  const handleFilesSelected = useCallback(
+    (tagId: string, selectedFiles: FileData[]) => {
+      dispatch({
+        type: "SET_FILES",
+        payload: { tagId, files: selectedFiles },
+      })
+    },
+    []
+  )
+
+  /**
+   * Creates a memoized file selection handler for a specific tag ID.
+   * @param tagId - The unique ID of the file tag
+   * @returns Function to handle file selections for this tag
+   */
+  const createFileSelectionHandler = useCallback(
+    (tagId: string) => (files: FileData[]) => handleFilesSelected(tagId, files),
+    [handleFilesSelected]
+  )
 
   /**
    * Handles template upload using showOpenFilePicker if available, or triggers file input.
@@ -142,15 +184,15 @@ export default function TemplateDisplay() {
         })
         const file = await handle.getFile()
         const content = await file.text()
-        parseAndSetSegments(content)
+        const newSegments = parseTemplate(content)
+        dispatch({ type: "SET_SEGMENTS", payload: newSegments })
+        dispatch({ type: "CLEAR_FILES" })
         setTemplateHandle(handle)
-        setFiles(new Map())
       } catch (error: any) {
         if (error.name === "AbortError") {
           // User canceled the file picker; silently ignore with no feedback
           return
         }
-        // Log and alert only for non-cancellation errors
         console.error("Error selecting template:", error)
         setAlertMessage("Failed to upload template. Please try again.")
       }
@@ -176,9 +218,10 @@ export default function TemplateDisplay() {
     const reader = new FileReader()
     reader.onload = (e) => {
       const content = e.target?.result as string
-      parseAndSetSegments(content)
+      const newSegments = parseTemplate(content)
+      dispatch({ type: "SET_SEGMENTS", payload: newSegments })
+      dispatch({ type: "CLEAR_FILES" })
       setTemplateHandle(null)
-      setFiles(new Map())
     }
     reader.onerror = () => {
       console.error("Error reading file:", reader.error)
@@ -189,22 +232,25 @@ export default function TemplateDisplay() {
 
   /**
    * Handles the Refresh button click to reload the template from the filesystem.
-   * Preserves the currently selected files and shows a "Template Refreshed" alert on success.
+   * Shows a confirmation dialog before clearing files and refreshing.
    */
   const handleRefresh = async () => {
-    if (templateHandle) {
-      try {
-        const file = await templateHandle.getFile()
-        const content = await file.text()
-        parseAndSetSegments(content)
-        // Selected files are preserved in the files Map
-        setAlertMessage("Template Refreshed")
-      } catch (error) {
-        console.error("Error refreshing template:", error)
-        setAlertMessage("Failed to refresh template. The file may have been moved or deleted.")
-      }
-    } else {
+    if (!templateHandle) {
       setAlertMessage("Please re-upload the template to refresh.")
+      return
+    }
+    const confirmed = confirm("Are you sure? This will clear all uploaded files.")
+    if (!confirmed) return
+    try {
+      const file = await templateHandle.getFile()
+      const content = await file.text()
+      const newSegments = parseTemplate(content)
+      dispatch({ type: "SET_SEGMENTS", payload: newSegments })
+      dispatch({ type: "CLEAR_FILES" })
+      setAlertMessage("Template Refreshed")
+    } catch (error) {
+      console.error("Error refreshing template:", error)
+      setAlertMessage("Failed to refresh template. The file may have been moved or deleted.")
     }
   }
 
@@ -212,8 +258,7 @@ export default function TemplateDisplay() {
    * Handles the Remove button click to reset the app state.
    */
   const handleRemove = () => {
-    setSegments([])
-    setFiles(new Map())
+    dispatch({ type: "RESET_STATE" })
     setTemplateHandle(null)
     setAlertMessage("Template Removed")
   }
@@ -224,30 +269,20 @@ export default function TemplateDisplay() {
    * then copies it to the clipboard.
    */
   const handleCopy = async () => {
-    // Iterate through segments to build output parts
-    const outputParts = segments.map(segment => {
+    const outputParts = state.segments.map((segment) => {
       if (segment.type === "markdown") {
-        // Include markdown content as-is for markdown segments
         return segment.content
       } else {
-        // Get selected files for this fileSelector segment's ID
-        const selectedFiles = files.get(segment.id!) || []
-        // Format each file's content with path separator and contents,
-        // joining them without additional separators
-        return selectedFiles.map(file => `-- ${file.path} --\n${file.contents}\n`).join('')
+        const selectedFiles = state.files.get(segment.id!) || []
+        return selectedFiles.map((file) => `-- ${file.path} --\n${file.contents}\n`).join("")
       }
     })
-    // Join all output parts into a single string without additional separators
-    const output = outputParts.join('')
+    const output = outputParts.join("")
     try {
-      // Attempt to copy the output to the clipboard using the Clipboard API
       await navigator.clipboard.writeText(output)
-      // Show success alert using existing alert system
       setAlertMessage("Copied to clipboard")
     } catch (error) {
-      // Log clipboard write error for debugging
       console.error("Failed to copy to clipboard:", error)
-      // Show error alert to inform user
       setAlertMessage("Failed to copy to clipboard. Please try again.")
     }
   }
@@ -257,7 +292,7 @@ export default function TemplateDisplay() {
    * @returns Array of rendered elements
    */
   const renderTemplate = useCallback(() => {
-    return segments.map((segment, index) => {
+    return state.segments.map((segment, index) => {
       if (segment.type === "markdown") {
         return (
           <ReactMarkdown
@@ -277,11 +312,11 @@ export default function TemplateDisplay() {
         />
       )
     })
-  }, [segments, createFileSelectionHandler])
+  }, [state.segments, createFileSelectionHandler])
 
   return (
     <div className="p-4">
-      {segments.length > 0 ? (
+      {state.segments.length > 0 ? (
         <div>
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold">Template</h2>

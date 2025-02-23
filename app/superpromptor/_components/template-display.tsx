@@ -11,8 +11,8 @@
  * - Uploads .md templates using showOpenFilePicker or <input type="file"> fallback
  * - Parses template to replace exact `<superpromptor-file>` tags with FileSelector components
  * - Renders markdown segments with file selection buttons
- * - Tracks selected files per `<superpromptor-file>` tag in a Map using a reducer
- * - Provides "Refresh" button to reload the template from the filesystem, preserving selected files
+ * - Tracks selected files and their handles per `<superpromptor-file>` tag in a Map using a reducer
+ * - Provides "Refresh" button to reload the template and all selected file contents from the filesystem
  * - Provides "Remove" button to reset the app state with a "Template Removed" alert
  * - Provides "Copy Contents To Clipboard" button to generate and copy the combined output
  * - Displays a disappearing alert for user feedback (e.g., "Template Refreshed", "Template Removed", "Copied to clipboard")
@@ -21,7 +21,7 @@
  * - react: For state (useState, useCallback, useRef, useReducer) and event handling
  * - react-markdown: For rendering markdown segments
  * - ./file-selector: Client component for file selection buttons
- * - @/types: For FileData type
+ * - @/types: For FileDataWithHandle type
  * - framer-motion: For AnimatePresence to manage alert animations
  * - @/components/alert: Reusable alert component for feedback
  *
@@ -32,7 +32,8 @@
  * - Buttons are styled with Tailwind per the design system
  * - Error handling covers file reading failures and invalid file types; silently ignores AbortError for user cancellations
  * - Alert animations require AnimatePresence in the parent component
- * - Refreshing preserves selected files, aligning with updated user requirements
+ * - Refreshing updates both template and file contents, preserving file selections
+ * - Files selected via fallback (<input>) cannot be refreshed due to lack of handles
  */
 
 "use client"
@@ -40,7 +41,7 @@
 import React, { useState, useCallback, useRef, useReducer } from "react"
 import ReactMarkdown from "react-markdown"
 import FileSelector from "./file-selector"
-import { FileData } from "@/types"
+import { FileDataWithHandle } from "@/types"
 import { AnimatePresence } from "framer-motion"
 import Alert from "@/components/alert"
 
@@ -56,13 +57,13 @@ interface Segment {
 // Reducer types and functions
 type Action =
   | { type: "SET_SEGMENTS"; payload: Segment[] }
-  | { type: "SET_FILES"; payload: { tagId: string; files: FileData[] } }
+  | { type: "SET_FILES"; payload: { tagId: string; files: FileDataWithHandle[] } }
   | { type: "CLEAR_FILES" }
   | { type: "RESET_STATE" }
 
 interface State {
   segments: Segment[]
-  files: Map<string, FileData[]>
+  files: Map<string, FileDataWithHandle[]>
 }
 
 const initialState: State = {
@@ -91,6 +92,27 @@ function reducer(state: State, action: Action): State {
     default:
       return state
   }
+}
+
+/**
+ * Helper function to read file contents as text
+ * @param file - File object to read
+ * @returns Promise resolving to the file contents as a string
+ */
+async function readFileContents(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result
+      if (typeof result !== "string") {
+        reject(new Error("File content is not a string"))
+        return
+      }
+      resolve(result)
+    }
+    reader.onerror = () => reject(reader.error)
+    reader.readAsText(file)
+  })
 }
 
 export default function TemplateDisplay() {
@@ -139,12 +161,12 @@ export default function TemplateDisplay() {
 
   /**
    * Handles file selection from a FileSelector instance.
-   * Updates the files Map with the selected files for the given tag ID.
+   * Updates the files Map with the selected files and handles for the given tag ID.
    * @param tagId - The unique ID of the `<superpromptor-file>` tag
-   * @param selectedFiles - Array of selected FileData objects
+   * @param selectedFiles - Array of selected FileDataWithHandle objects
    */
   const handleFilesSelected = useCallback(
-    (tagId: string, selectedFiles: FileData[]) => {
+    (tagId: string, selectedFiles: FileDataWithHandle[]) => {
       dispatch({
         type: "SET_FILES",
         payload: { tagId, files: selectedFiles },
@@ -159,7 +181,7 @@ export default function TemplateDisplay() {
    * @returns Function to handle file selections for this tag
    */
   const createFileSelectionHandler = useCallback(
-    (tagId: string) => (files: FileData[]) => handleFilesSelected(tagId, files),
+    (tagId: string) => (files: FileDataWithHandle[]) => handleFilesSelected(tagId, files),
     [handleFilesSelected]
   )
 
@@ -190,7 +212,6 @@ export default function TemplateDisplay() {
         setTemplateHandle(handle)
       } catch (error: any) {
         if (error.name === "AbortError") {
-          // User canceled the file picker; silently ignore with no feedback
           return
         }
         console.error("Error selecting template:", error)
@@ -231,8 +252,8 @@ export default function TemplateDisplay() {
   }
 
   /**
-   * Handles the Refresh button click to reload the template from the filesystem.
-   * Preserves the currently selected files and updates only the template segments.
+   * Handles the Refresh button click to reload the template and all selected file contents from the filesystem.
+   * Preserves the file selections while updating their contents if handles are available.
    */
   const handleRefresh = async () => {
     if (!templateHandle) {
@@ -240,14 +261,42 @@ export default function TemplateDisplay() {
       return
     }
     try {
-      const file = await templateHandle.getFile()
-      const content = await file.text()
-      const newSegments = parseTemplate(content)
+      // Refresh the template
+      const templateFile = await templateHandle.getFile()
+      const templateContent = await templateFile.text()
+      const newSegments = parseTemplate(templateContent)
+
+      // Refresh all selected file contents
+      const updatedFiles = new Map<string, FileDataWithHandle[]>()
+      for (const [tagId, files] of state.files) {
+        const refreshedFiles = await Promise.all(
+          files.map(async (fileData) => {
+            if (fileData.handle) {
+              try {
+                const file = await fileData.handle.getFile()
+                const contents = await readFileContents(file)
+                return { ...fileData, size: file.size, contents }
+              } catch (error) {
+                console.error(`Error refreshing file ${fileData.path}:`, error)
+                return fileData // Keep old data if refresh fails
+              }
+            }
+            return fileData // No handle, keep as-is
+          })
+        )
+        updatedFiles.set(tagId, refreshedFiles)
+      }
+
+      // Update state with refreshed template and files
       dispatch({ type: "SET_SEGMENTS", payload: newSegments })
-      setAlertMessage("Template Refreshed")
+      for (const [tagId, files] of updatedFiles) {
+        dispatch({ type: "SET_FILES", payload: { tagId, files } })
+      }
+
+      setAlertMessage("Template and files refreshed")
     } catch (error) {
-      console.error("Error refreshing template:", error)
-      setAlertMessage("Failed to refresh template. The file may have been moved or deleted.")
+      console.error("Error during refresh:", error)
+      setAlertMessage("Failed to refresh. Some files may have been moved or deleted.")
     }
   }
 

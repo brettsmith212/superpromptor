@@ -6,6 +6,7 @@
  * users to select multiple files or a folder. For folder selections, it displays a toggleable tree
  * view to select specific files, showing selected files with options to remove them and add more.
  * It includes logic to warn users about large files (>10MB) and ask for confirmation before inclusion.
+ * It now passes file handles to the parent for refresh functionality.
  *
  * Key features:
  * - Button with dropdown to select multiple files or a folder
@@ -15,11 +16,12 @@
  * - Plus sign button to reopen the tree view or file picker
  * - Updates button text to "Change Files" after selection
  * - Shows confirmation dialog for files larger than 10MB before inclusion
+ * - Passes FileSystemFileHandle with FileData to parent for refreshing contents
  *
  * @dependencies
  * - react: For state management (useState, useCallback, useMemo, useEffect) and event handling
  * - lucide-react: For icons (Plus, X)
- * - @/types: For FileData type
+ * - @/types: For FileData and FileDataWithHandle types
  * - @/components/ui/dialog: For confirmation dialog (Shadcn UI)
  * - @/components/ui/button: For dialog buttons (Shadcn UI)
  *
@@ -30,13 +32,14 @@
  * - Allows multiple files with the same path (e.g., direct vs. folder selection); removal by path may remove all instances
  * - Error handling silently ignores AbortError for user cancellations, alerts for other issues
  * - Large file warnings are handled via a confirmation dialog using Shadcn UI components
+ * - Handles are null for files selected via input fallback, limiting refresh capability in those cases
  */
 
 "use client"
 
 import { useState, useCallback, useMemo, useEffect } from "react"
 import { Plus, X } from "lucide-react"
-import type { FileData } from "@/types"
+import type { FileData, FileDataWithHandle } from "@/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 
@@ -51,10 +54,10 @@ interface FileSelectorProps {
   id: string
 
   /**
-   * Callback to pass selected files to the parent component.
-   * @param files - Array of selected FileData objects
+   * Callback to pass selected files and their handles to the parent component.
+   * @param files - Array of FileDataWithHandle objects including file data and handles
    */
-  onFilesSelected: (files: FileData[]) => void
+  onFilesSelected: (files: FileDataWithHandle[]) => void
 }
 
 /**
@@ -64,7 +67,7 @@ interface FileItemProps {
   handle: FileSystemFileHandle
   path: string
   selectedPaths: Set<string>
-  addFile: (fileData: FileData) => void
+  addFile: (fileData: FileDataWithHandle) => void
   removeFile: (path: string) => void
   confirmLargeFile: (file: File) => Promise<boolean>
 }
@@ -76,7 +79,7 @@ interface FolderTreeViewProps {
   directoryHandle: FileSystemDirectoryHandle
   currentPath: string
   selectedPaths: Set<string>
-  addFile: (fileData: FileData) => void
+  addFile: (fileData: FileDataWithHandle) => void
   removeFile: (path: string) => void
   isRoot?: boolean
   level?: number
@@ -131,9 +134,8 @@ const FileItem: React.FC<FileItemProps> = ({
         }
         if (include) {
           const contents = await readFileContents(file)
-          addFile({ path, size: file.size, contents })
+          addFile({ path, size: file.size, contents, handle })
         } else {
-          // If not included, ensure the checkbox is unchecked
           e.target.checked = false
         }
       } catch (error) {
@@ -187,7 +189,6 @@ const FolderTreeView: React.FC<FolderTreeViewProps> = ({
           for await (const entry of directoryHandle.entries()) {
             newEntries.push(entry)
           }
-          // Sort: folders first, then files, alphabetically
           newEntries.sort((a, b) => {
             if (a[1].kind === "directory" && b[1].kind === "file") return -1
             if (a[1].kind === "file" && b[1].kind === "directory") return 1
@@ -281,7 +282,7 @@ const FolderTreeView: React.FC<FolderTreeViewProps> = ({
  * Main FileSelector component
  */
 export default function FileSelector({ id, onFilesSelected }: FileSelectorProps) {
-  const [files, setFiles] = useState<FileData[]>([])
+  const [files, setFiles] = useState<FileDataWithHandle[]>([])
   const [rootFolder, setRootFolder] = useState<FileSystemDirectoryHandle | null>(null)
   const [showMenu, setShowMenu] = useState(false)
   const [showTreeView, setShowTreeView] = useState(false)
@@ -290,10 +291,10 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
   const [resolveConfirm, setResolveConfirm] = useState<((value: boolean) => void) | null>(null)
 
   /**
-   * Updates both local state and parent with new files
+   * Updates both local state and parent with new files including handles
    */
   const updateFiles = useCallback(
-    (newFiles: FileData[]) => {
+    (newFiles: FileDataWithHandle[]) => {
       setFiles(newFiles)
       onFilesSelected(newFiles)
     },
@@ -304,7 +305,7 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
    * Adds a file to the selection, allowing duplicates
    */
   const addFile = useCallback(
-    (fileData: FileData) => {
+    (fileData: FileDataWithHandle) => {
       const newFiles = [...files, fileData]
       updateFiles(newFiles)
     },
@@ -363,15 +364,13 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
         if (include) {
           const contents = await readFileContents(file)
           const path = file.name // For direct selection, use file name
-          addFile({ path, size: file.size, contents })
+          addFile({ path, size: file.size, contents, handle })
         }
       }
     } catch (error: any) {
       if (error.name === "AbortError") {
-        // User canceled the file picker; silently ignore with no feedback
         return
       }
-      // Log and alert only for non-cancellation errors
       console.error(`Error selecting files for selector ${id}:`, error)
       alert("Failed to select files. Please try again or check console for details.")
     }
@@ -395,10 +394,8 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
       console.log(`Folder selected for selector ${id}:`, folderHandle.name)
     } catch (error: any) {
       if (error.name === "AbortError") {
-        // User canceled the folder picker; silently ignore with no feedback
         return
       }
-      // Log and alert only for non-cancellation errors
       console.error(`Error selecting folder for selector ${id}:`, error)
       alert("Failed to select folder. Please try again or check console for details.")
     }

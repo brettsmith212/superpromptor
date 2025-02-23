@@ -7,17 +7,19 @@
  * 
  * Key features:
  * - FileData: Represents individual file metadata and contents
+ * - FileDataWithHandle: Extends FileData with a handle for refreshing file contents
  * - TemplateState: Manages the template string and associated file selections
- * - FileSelectorNode: Custom node type for <file> tags in the markdown AST
+ * - FileSelectorNode: Custom node type for <superpromptor-file> tags in the markdown AST
  * 
  * @dependencies
  * - unist: For base Node type extended by FileSelectorNode
  * 
  * @notes
  * - File contents are stored as strings to simplify clipboard output generation
- * - The files Map in TemplateState uses a string key (tag ID) to associate files with specific <file> tags
+ * - The files Map in TemplateState uses a string key (tag ID) to associate files with specific <superpromptor-file> tags
  * - FileSelectorNode extends Node for compatibility with unist-util-visit and react-markdown
  * - Interfaces are preferred over type aliases per project rules
+ * - FileDataWithHandle includes an optional handle, null for fallback selections
  */
 
 import { Node } from 'unist'
@@ -42,16 +44,24 @@ export interface FileData {
   contents: string;
 }
 
+export interface FileDataWithHandle extends FileData {
+  /**
+   * The FileSystemFileHandle associated with this file, used for refreshing contents.
+   * Null if the file was selected via fallback (<input>) or handle is unavailable.
+   */
+  handle: FileSystemFileHandle | null;
+}
+
 export interface TemplateState {
   /**
    * The raw markdown template string uploaded by the user.
-   * Contains <file> tags to be replaced with file contents in the output.
+   * Contains <superpromptor-file> tags to be replaced with file contents in the output.
    */
   template: string;
 
   /**
-   * A Map associating each <file> tag's unique ID with an array of selected files.
-   * Key: A generated ID for each <file> tag instance (e.g., "file-1", "file-2").
+   * A Map associating each <superpromptor-file> tag's unique ID with an array of selected files.
+   * Key: A generated ID for each <superpromptor-file> tag instance (e.g., "file-1", "file-2").
    * Value: Array of FileData objects representing the selected files for that tag.
    */
   files: Map<string, FileData[]>;
@@ -65,7 +75,7 @@ export interface FileSelectorNode extends Node {
 
   /**
    * A unique identifier for this file selector instance,
-   * corresponding to a specific `<file>` tag in the template (e.g., "file-1").
+   * corresponding to a specific `<superpromptor-file>` tag in the template (e.g., "file-1").
    */
   id: string;
 }

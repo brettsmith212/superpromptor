@@ -1,23 +1,21 @@
-"use client"
-
 /**
  * @file Template Display component for SuperPromptor
  * @description
  * This client-side component manages the upload, markdown rendering, file selection,
  * and template management workflow for the SuperPromptor application. It allows users
- * to upload a .md template, parses it into segments with `<file>` tags replaced by
- * FileSelector components, renders the result, and provides "Refresh" and "Remove"
- * buttons to manage the template. It tracks selected files and displays alerts for
- * user feedback.
+ * to upload a .md template, parses it into segments with `<superpromptor-file>` tags replaced by
+ * FileSelector components, renders the result, and provides "Refresh", "Remove", and "Copy Contents To Clipboard"
+ * buttons to manage the template and generate the final output.
  *
  * Key features:
  * - Uploads .md templates using showOpenFilePicker or <input type="file"> fallback
- * - Parses template to replace exact `<file>` tags with FileSelector components
+ * - Parses template to replace exact `<superpromptor-file>` tags with FileSelector components
  * - Renders markdown segments with file selection buttons
- * - Tracks selected files per `<file>` tag in a Map
+ * - Tracks selected files per `<superpromptor-file>` tag in a Map
  * - Provides "Refresh" button to reload the template and clear files
  * - Provides "Remove" button to reset the app state with an alert
- * - Displays a disappearing alert for user feedback (e.g., "Template Removed")
+ * - Provides "Copy Contents To Clipboard" button to generate and copy the combined output
+ * - Displays a disappearing alert for user feedback (e.g., "Template Removed", "Copied to clipboard")
  *
  * @dependencies
  * - react: For state (useState, useCallback, useRef) and event handling
@@ -28,13 +26,16 @@
  * - @/components/alert: Reusable alert component for feedback
  *
  * @notes
- * - Uses regex to ensure only exact `<file>` tags are replaced
+ * - Uses regex to ensure only exact `<superpromptor-file>` tags are replaced
  * - Stores FileSystemFileHandle for refresh functionality when available
  * - Falls back to prompting re-upload in browsers without File System Access API
  * - Buttons are styled with Tailwind per the design system
  * - Error handling covers file reading failures and invalid file types
  * - Alert animations require AnimatePresence in the parent component
+ * - The "Copy Contents To Clipboard" button generates the output by combining markdown segments and formatted file contents
  */
+
+"use client"
 
 import React, { useState, useCallback, useRef } from "react"
 import ReactMarkdown from "react-markdown"
@@ -62,7 +63,7 @@ export default function TemplateDisplay() {
   /**
    * Handles file selection from a FileSelector instance.
    * Updates the files Map with the selected files for the given tag ID.
-   * @param tagId - The unique ID of the `<file>` tag
+   * @param tagId - The unique ID of the `<superpromptor-file>` tag
    * @param selectedFiles - Array of selected FileData objects
    */
   const handleFilesSelected = useCallback((tagId: string, selectedFiles: FileData[]) => {
@@ -212,6 +213,40 @@ export default function TemplateDisplay() {
   }
 
   /**
+   * Handles the Copy Contents To Clipboard button click.
+   * Generates the output by combining the template and selected file contents,
+   * then copies it to the clipboard.
+   */
+  const handleCopy = async () => {
+    // Iterate through segments to build output parts
+    const outputParts = segments.map(segment => {
+      if (segment.type === "markdown") {
+        // Include markdown content as-is for markdown segments
+        return segment.content
+      } else {
+        // Get selected files for this fileSelector segment's ID
+        const selectedFiles = files.get(segment.id!) || []
+        // Format each file's content with path separator and contents,
+        // joining them without additional separators
+        return selectedFiles.map(file => `-- ${file.path} --\n${file.contents}\n`).join('')
+      }
+    })
+    // Join all output parts into a single string without additional separators
+    const output = outputParts.join('')
+    try {
+      // Attempt to copy the output to the clipboard using the Clipboard API
+      await navigator.clipboard.writeText(output)
+      // Show success alert using existing alert system
+      setAlertMessage("Copied to clipboard")
+    } catch (error) {
+      // Log clipboard write error for debugging
+      console.error("Failed to copy to clipboard:", error)
+      // Show error alert to inform user
+      setAlertMessage("Failed to copy to clipboard. Please try again.")
+    }
+  }
+
+  /**
    * Renders the parsed segments as markdown and FileSelector components.
    * @returns Array of rendered elements
    */
@@ -261,6 +296,14 @@ export default function TemplateDisplay() {
           </div>
           <div className="inline-flex flex-wrap items-baseline gap-2">
             {renderTemplate()}
+          </div>
+          <div className="mt-4">
+            <button
+              onClick={handleCopy}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Copy Contents To Clipboard
+            </button>
           </div>
         </div>
       ) : (

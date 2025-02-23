@@ -12,7 +12,7 @@
  * - Parses template to replace exact `<superpromptor-file>` tags with FileSelector components
  * - Renders markdown segments with file selection buttons
  * - Tracks selected files per `<superpromptor-file>` tag in a Map using a reducer
- * - Provides "Refresh" button to reload the template from the filesystem, clearing files after confirmation
+ * - Provides "Refresh" button to reload the template from the filesystem, preserving selected files
  * - Provides "Remove" button to reset the app state with a "Template Removed" alert
  * - Provides "Copy Contents To Clipboard" button to generate and copy the combined output
  * - Displays a disappearing alert for user feedback (e.g., "Template Refreshed", "Template Removed", "Copied to clipboard")
@@ -32,7 +32,7 @@
  * - Buttons are styled with Tailwind per the design system
  * - Error handling covers file reading failures and invalid file types; silently ignores AbortError for user cancellations
  * - Alert animations require AnimatePresence in the parent component
- * - Refreshing now clears files with a confirmation prompt, aligning with project requirements
+ * - Refreshing preserves selected files, aligning with updated user requirements
  */
 
 "use client"
@@ -232,21 +232,18 @@ export default function TemplateDisplay() {
 
   /**
    * Handles the Refresh button click to reload the template from the filesystem.
-   * Shows a confirmation dialog before clearing files and refreshing.
+   * Preserves the currently selected files and updates only the template segments.
    */
   const handleRefresh = async () => {
     if (!templateHandle) {
       setAlertMessage("Please re-upload the template to refresh.")
       return
     }
-    const confirmed = confirm("Are you sure? This will clear all uploaded files.")
-    if (!confirmed) return
     try {
       const file = await templateHandle.getFile()
       const content = await file.text()
       const newSegments = parseTemplate(content)
       dispatch({ type: "SET_SEGMENTS", payload: newSegments })
-      dispatch({ type: "CLEAR_FILES" })
       setAlertMessage("Template Refreshed")
     } catch (error) {
       console.error("Error refreshing template:", error)

@@ -12,10 +12,10 @@
  * - Parses template to replace exact `<superpromptor-file>` tags with FileSelector components
  * - Renders markdown segments with file selection buttons
  * - Tracks selected files per `<superpromptor-file>` tag in a Map
- * - Provides "Refresh" button to reload the template and clear files
- * - Provides "Remove" button to reset the app state with an alert
+ * - Provides "Refresh" button to reload the template from the filesystem, preserving selected files, with a "Template Refreshed" alert
+ * - Provides "Remove" button to reset the app state with a "Template Removed" alert
  * - Provides "Copy Contents To Clipboard" button to generate and copy the combined output
- * - Displays a disappearing alert for user feedback (e.g., "Template Removed", "Copied to clipboard")
+ * - Displays a disappearing alert for user feedback (e.g., "Template Refreshed", "Template Removed", "Copied to clipboard")
  *
  * @dependencies
  * - react: For state (useState, useCallback, useRef) and event handling
@@ -32,7 +32,7 @@
  * - Buttons are styled with Tailwind per the design system
  * - Error handling covers file reading failures and invalid file types
  * - Alert animations require AnimatePresence in the parent component
- * - The "Copy Contents To Clipboard" button generates the output by combining markdown segments and formatted file contents
+ * - Refreshing reloads the template but preserves selected files, per user preference, with a success alert
  */
 
 "use client"
@@ -182,20 +182,20 @@ export default function TemplateDisplay() {
   }
 
   /**
-   * Handles the Refresh button click to reload the template and clear files.
+   * Handles the Refresh button click to reload the template from the filesystem.
+   * Preserves the currently selected files and shows a "Template Refreshed" alert on success.
    */
   const handleRefresh = async () => {
     if (templateHandle) {
-      if (window.confirm("Are you sure? This will clear all uploaded files.")) {
-        try {
-          const file = await templateHandle.getFile()
-          const content = await file.text()
-          parseAndSetSegments(content)
-          setFiles(new Map())
-        } catch (error) {
-          console.error("Error refreshing template:", error)
-          setAlertMessage("Failed to refresh template. The file may have been moved or deleted.")
-        }
+      try {
+        const file = await templateHandle.getFile()
+        const content = await file.text()
+        parseAndSetSegments(content)
+        // Selected files are preserved in the files Map
+        setAlertMessage("Template Refreshed")
+      } catch (error) {
+        console.error("Error refreshing template:", error)
+        setAlertMessage("Failed to refresh template. The file may have been moved or deleted.")
       }
     } else {
       setAlertMessage("Please re-upload the template to refresh.")

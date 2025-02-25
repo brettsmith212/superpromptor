@@ -2,19 +2,19 @@
 
 /**
  * @file Navigation panel component for SuperPromptor
- * @description 
- * This client-side component renders a horizontal navigation bar for the SuperPromptor 
- * application. It displays the app name "SuperPromptor" on the left and a link to 
- * "How To Use" on the right, fulfilling the navigation requirements with a revised design.
- * 
+ * @description
+ * This client-side component renders a horizontal navigation bar for the SuperPromptor
+ * application. It displays the app name "SuperPromptor" linking to the root page '/' on the left
+ * and a link to "How To Use" on the right, fulfilling the navigation requirements with a revised design.
+ *
  * Key features:
- * - Displays "SuperPromptor" as a bold link on the left
+ * - Displays "SuperPromptor" as a bold link to '/' on the left
  * - Provides an underlined "How To Use" link on the right
  * - Uses Tailwind CSS for horizontal layout, responsive design, and dark mode support
- * 
+ *
  * @dependencies
  * - next/link: For client-side routing between pages
- * 
+ *
  * @notes
  * - Marked as "use client" per project rules for client-side routing
  * - Placed in /components/ as a shared component used by the root layout
@@ -32,7 +32,7 @@ export default function NavigationPanel() {
       <nav className="flex justify-between items-center">
         {/* Left side: App name */}
         <Link
-          href="/superpromptor"
+          href="/"
           className="text-xl font-bold text-gray-900 dark:text-gray-100 hover:text-blue-500 dark:hover:text-blue-400"
         >
           SuperPromptor

@@ -17,6 +17,7 @@
  * - Updates button text to "Change Files" after selection
  * - Shows confirmation dialog for files larger than 10MB before inclusion
  * - Passes FileSystemFileHandle with FileData to parent for refreshing contents
+ * - Handles file access errors gracefully
  *
  * @dependencies
  * - react: For state management (useState, useCallback, useMemo, useEffect) and event handling

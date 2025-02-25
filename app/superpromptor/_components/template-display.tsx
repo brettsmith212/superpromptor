@@ -16,6 +16,7 @@
  * - Provides "Remove" button to reset the app state with a "Template Removed" alert
  * - Provides "Copy Contents To Clipboard" button to generate and copy the combined output
  * - Displays a disappearing alert for user feedback (e.g., "Template Refreshed", "Template Removed", "Copied to clipboard")
+ * - Handles errors for non-.md uploads, file access issues, and clipboard operations
  *
  * @dependencies
  * - react: For state (useState, useCallback, useRef, useReducer) and event handling
@@ -30,7 +31,8 @@
  * - Stores FileSystemFileHandle for refresh functionality when available
  * - Falls back to prompting re-upload in browsers without File System Access API
  * - Buttons are styled with Tailwind per the design system
- * - Error handling covers file reading failures and invalid file types; silently ignores AbortError for user cancellations
+ * - Error handling covers file reading failures, invalid file types, and clipboard errors
+ * - Silently ignores AbortError for user cancellations
  * - Alert animations require AnimatePresence in the parent component
  * - Refreshing updates both template and file contents, preserving file selections
  * - Files selected via fallback (<input>) cannot be refreshed due to lack of handles
@@ -119,6 +121,7 @@ export default function TemplateDisplay() {
   const [state, dispatch] = useReducer(reducer, initialState)
   const [templateHandle, setTemplateHandle] = useState<FileSystemFileHandle | null>(null)
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
+  const [alertType, setAlertType] = useState<"info" | "error">("info")
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   /**
@@ -205,6 +208,11 @@ export default function TemplateDisplay() {
           multiple: false,
         })
         const file = await handle.getFile()
+        if (!file.name.endsWith(".md")) {
+          setAlertMessage("Please upload a .md file")
+          setAlertType("error")
+          return
+        }
         const content = await file.text()
         const newSegments = parseTemplate(content)
         dispatch({ type: "SET_SEGMENTS", payload: newSegments })
@@ -216,6 +224,7 @@ export default function TemplateDisplay() {
         }
         console.error("Error selecting template:", error)
         setAlertMessage("Failed to upload template. Please try again.")
+        setAlertType("error")
       }
     } else {
       fileInputRef.current?.click()
@@ -232,6 +241,7 @@ export default function TemplateDisplay() {
 
     if (!file.name.endsWith(".md")) {
       setAlertMessage("Please upload a .md file")
+      setAlertType("error")
       event.target.value = ""
       return
     }
@@ -247,6 +257,7 @@ export default function TemplateDisplay() {
     reader.onerror = () => {
       console.error("Error reading file:", reader.error)
       setAlertMessage("Failed to read the template file.")
+      setAlertType("error")
     }
     reader.readAsText(file)
   }
@@ -258,6 +269,7 @@ export default function TemplateDisplay() {
   const handleRefresh = async () => {
     if (!templateHandle) {
       setAlertMessage("Please re-upload the template to refresh.")
+      setAlertType("error")
       return
     }
     try {
@@ -278,6 +290,8 @@ export default function TemplateDisplay() {
                 return { ...fileData, size: file.size, contents }
               } catch (error) {
                 console.error(`Error refreshing file ${fileData.path}:`, error)
+                setAlertMessage(`Failed to refresh file: ${fileData.path}`)
+                setAlertType("error")
                 return fileData // Keep old data if refresh fails
               }
             }
@@ -294,9 +308,11 @@ export default function TemplateDisplay() {
       }
 
       setAlertMessage("Template and files refreshed")
+      setAlertType("info")
     } catch (error) {
       console.error("Error during refresh:", error)
       setAlertMessage("Failed to refresh. Some files may have been moved or deleted.")
+      setAlertType("error")
     }
   }
 
@@ -307,6 +323,7 @@ export default function TemplateDisplay() {
     dispatch({ type: "RESET_STATE" })
     setTemplateHandle(null)
     setAlertMessage("Template Removed")
+    setAlertType("info")
   }
 
   /**
@@ -327,9 +344,11 @@ export default function TemplateDisplay() {
     try {
       await navigator.clipboard.writeText(output)
       setAlertMessage("Copied to clipboard")
+      setAlertType("info")
     } catch (error) {
       console.error("Failed to copy to clipboard:", error)
-      setAlertMessage("Failed to copy to clipboard. Please try again.")
+      setAlertMessage("Failed to copy to clipboard. Please ensure clipboard permissions are enabled.")
+      setAlertType("error")
     }
   }
 
@@ -415,6 +434,7 @@ export default function TemplateDisplay() {
           <Alert
             key="alert"
             message={alertMessage}
+            type={alertType}
             onClose={() => setAlertMessage(null)}
           />
         )}

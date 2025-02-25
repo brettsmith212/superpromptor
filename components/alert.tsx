@@ -1,5 +1,3 @@
-"use client"
-
 /**
  * @file Disappearing alert component for SuperPromptor
  * @description
@@ -10,9 +8,10 @@
  *
  * Key features:
  * - Displays a message passed via props
+ * - Supports different types: "info" (blue) and "error" (red)
  * - Automatically closes after 3 seconds using a timeout
  * - Uses Framer Motion for smooth entrance and exit animations
- * - Styled with Tailwind CSS for a blue background and white text
+ * - Styled with Tailwind CSS for background color based on type
  *
  * @dependencies
  * - react: For useEffect to manage the timeout
@@ -26,15 +25,25 @@
  * - Assumes framer-motion is installed as per Step 1 of the implementation plan
  */
 
+"use client"
+
 import { useEffect } from "react"
 import { motion } from "framer-motion"
 
 interface AlertProps {
   /**
    * The message to display in the alert.
-   * Example: "Template Removed"
+   * Example: "Template Removed" or "Error: Invalid file type"
    */
   message: string
+
+  /**
+   * The type of the alert, affecting its styling.
+   * - "info": Blue background for informational messages
+   * - "error": Red background for error messages
+   * Default: "info"
+   */
+  type?: "info" | "error"
 
   /**
    * Callback function to close the alert, typically clearing the message in the parent component.
@@ -43,7 +52,7 @@ interface AlertProps {
   onClose: () => void
 }
 
-export default function Alert({ message, onClose }: AlertProps) {
+export default function Alert({ message, type = "info", onClose }: AlertProps) {
   useEffect(() => {
     const timer = setTimeout(() => {
       onClose()
@@ -51,12 +60,14 @@ export default function Alert({ message, onClose }: AlertProps) {
     return () => clearTimeout(timer)
   }, [onClose])
 
+  const bgColor = type === "error" ? "bg-red-500" : "bg-blue-500"
+
   return (
     <motion.div
       initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -20 }}
-      className="fixed top-4 right-4 bg-blue-500 text-white p-4 rounded shadow-lg z-50"
+      className={`fixed top-4 right-4 ${bgColor} text-white p-4 rounded shadow-lg z-50`}
     >
       {message}
     </motion.div>

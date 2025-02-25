@@ -10,7 +10,7 @@
  * Key features:
  * - Uploads .md templates using showOpenFilePicker or <input type="file"> fallback
  * - Parses template to replace exact `<superpromptor-file>` tags with FileSelector components
- * - Renders markdown segments with file selection buttons
+ * - Renders markdown segments with file selection buttons, ensuring content after FileSelector starts on a new line
  * - Tracks selected files and their handles per `<superpromptor-file>` tag in a Map using a reducer
  * - Provides "Refresh" button to reload the template and all selected file contents from the filesystem
  * - Provides "Remove" button to reset the app state with a "Template Removed" alert
@@ -360,21 +360,23 @@ export default function TemplateDisplay() {
     return state.segments.map((segment, index) => {
       if (segment.type === "markdown") {
         return (
-          <ReactMarkdown
-            key={`markdown-${index}`}
-            className="prose dark:prose-invert inline max-w-none"
-          >
-            {segment.content!}
-          </ReactMarkdown>
+          <div key={`markdown-${index}`} className="inline">
+            <ReactMarkdown
+              className="prose dark:prose-invert inline max-w-none"
+            >
+              {segment.content!}
+            </ReactMarkdown>
+          </div>
         )
       }
       const onFilesSelected = createFileSelectionHandler(segment.id!)
       return (
-        <FileSelector
-          key={segment.id}
-          id={segment.id!}
-          onFilesSelected={onFilesSelected}
-        />
+        <div key={segment.id} className="block">
+          <FileSelector
+            id={segment.id!}
+            onFilesSelected={onFilesSelected}
+          />
+        </div>
       )
     })
   }, [state.segments, createFileSelectionHandler])
@@ -400,7 +402,7 @@ export default function TemplateDisplay() {
               </button>
             </div>
           </div>
-          <div className="inline-flex flex-wrap items-baseline gap-2">
+          <div className="flex flex-col gap-2">
             {renderTemplate()}
           </div>
           <div className="mt-4">

@@ -7,7 +7,7 @@
  * view to select specific files, showing selected files with options to remove them and add more.
  * It includes logic to warn users about large files (>10MB) and ask for confirmation before inclusion.
  * It now passes file handles to the parent for refresh functionality and ensures folder-level checkboxes
- * correctly select/deselect all files recursively without requiring folder expansion.
+ * correctly select/deselection all files recursively without requiring folder expansion.
  *
  * Key features:
  * - Button with dropdown to select multiple files or a folder
@@ -20,6 +20,7 @@
  * - Shows confirmation dialog for files larger than 10MB before inclusion
  * - Passes FileSystemFileHandle with FileData to parent for refreshing contents
  * - Handles file access errors gracefully
+ * - Adds a "Clear Files" button to reset all selected files
  *
  * @dependencies
  * - react: For state management (useState, useCallback, useMemo, useEffect) and event handling
@@ -382,6 +383,13 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
     [onFilesSelected]
   )
 
+  const clearFiles = useCallback(() => {
+    setFiles([])
+    setRootFolder(null)
+    setShowTreeView(false)
+    onFilesSelected([])
+  }, [onFilesSelected])
+
   const selectedPaths = useMemo(() => new Set(files.map((f) => f.path)), [files])
 
   const confirmLargeFile = (file: File): Promise<boolean> => {
@@ -461,12 +469,22 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
 
   return (
     <div className="inline-block relative">
-      <button
-        onClick={() => setShowMenu(!showMenu)}
-        className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
-      >
-        {files.length > 0 ? "Change Files" : "Select Files"}
-      </button>
+      <div className="flex items-center space-x-2">
+        <button
+          onClick={() => setShowMenu(!showMenu)}
+          className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
+        >
+          {files.length > 0 ? "Change Files" : "Select Files"}
+        </button>
+        {files.length > 0 && (
+          <button
+            onClick={clearFiles}
+            className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600 transition-colors"
+          >
+            Clear Files
+          </button>
+        )}
+      </div>
 
       {showMenu && (
         <div className="absolute z-10 bg-white dark:bg-gray-800 shadow-md rounded mt-2">

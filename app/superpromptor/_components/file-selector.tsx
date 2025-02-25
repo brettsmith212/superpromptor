@@ -6,11 +6,13 @@
  * users to select multiple files or a folder. For folder selections, it displays a toggleable tree
  * view to select specific files, showing selected files with options to remove them and add more.
  * It includes logic to warn users about large files (>10MB) and ask for confirmation before inclusion.
- * It now passes file handles to the parent for refresh functionality.
+ * It now passes file handles to the parent for refresh functionality and ensures folder-level checkboxes
+ * correctly select/deselect all files recursively without requiring folder expansion.
  *
  * Key features:
  * - Button with dropdown to select multiple files or a folder
  * - Toggleable tree view for folder selections with recursive folder navigation
+ * - Folder-level checkbox to select/deselect all files recursively without prior expansion
  * - Displays selected files with relative paths and sizes
  * - Allows removing individual files from the selection
  * - Plus sign button to reopen the tree view or file picker
@@ -34,6 +36,7 @@
  * - Error handling silently ignores AbortError for user cancellations, alerts for other issues
  * - Large file warnings are handled via a confirmation dialog using Shadcn UI components
  * - Handles are null for files selected via input fallback, limiting refresh capability in those cases
+ * - Folder checkboxes now correctly handle recursive selection/deselection without requiring "+" click
  */
 
 "use client"
@@ -48,16 +51,7 @@ import { Button } from "@/components/ui/button"
  * Props for the FileSelector component
  */
 interface FileSelectorProps {
-  /**
-   * A unique identifier for this file selector instance,
-   * corresponding to a specific `<superpromptor-file>` tag in the template.
-   */
   id: string
-
-  /**
-   * Callback to pass selected files and their handles to the parent component.
-   * @param files - Array of FileDataWithHandle objects including file data and handles
-   */
   onFilesSelected: (files: FileDataWithHandle[]) => void
 }
 
@@ -80,8 +74,8 @@ interface FolderTreeViewProps {
   directoryHandle: FileSystemDirectoryHandle
   currentPath: string
   selectedPaths: Set<string>
-  addFile: (fileData: FileDataWithHandle) => void
-  removeFile: (path: string) => void
+  updateFiles: (newFiles: FileDataWithHandle[]) => void
+  files: FileDataWithHandle[]
   isRoot?: boolean
   level?: number
   confirmLargeFile: (file: File) => Promise<boolean>
@@ -89,8 +83,6 @@ interface FolderTreeViewProps {
 
 /**
  * Helper function to read file contents as text
- * @param file - File object to read
- * @returns Promise resolving to the file contents as a string
  */
 async function readFileContents(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -109,6 +101,28 @@ async function readFileContents(file: File): Promise<string> {
 }
 
 /**
+ * Recursively collects all file handles within a directory
+ */
+async function getAllFilesInDirectory(
+  directoryHandle: FileSystemDirectoryHandle,
+  currentPath: string
+): Promise<{ handle: FileSystemFileHandle; path: string }[]> {
+  const files: { handle: FileSystemFileHandle; path: string }[] = []
+  for await (const [name, handle] of directoryHandle.entries()) {
+    if (handle.kind === "file") {
+      files.push({ handle: handle as FileSystemFileHandle, path: currentPath + name })
+    } else if (handle.kind === "directory") {
+      const subFiles = await getAllFilesInDirectory(
+        handle as FileSystemDirectoryHandle,
+        currentPath + name + "/"
+      )
+      files.push(...subFiles)
+    }
+  }
+  return files
+}
+
+/**
  * Component to render individual files in the tree view with checkboxes
  */
 const FileItem: React.FC<FileItemProps> = ({
@@ -121,9 +135,6 @@ const FileItem: React.FC<FileItemProps> = ({
 }) => {
   const isSelected = selectedPaths.has(path)
 
-  /**
-   * Handles checkbox changes, checking file size and reading contents only if confirmed
-   */
   const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const checked = e.target.checked
     if (checked) {
@@ -164,24 +175,37 @@ const FileItem: React.FC<FileItemProps> = ({
 }
 
 /**
- * Recursive component to render the folder tree view
+ * Recursive component to render the folder tree view with folder-level checkboxes
  */
 const FolderTreeView: React.FC<FolderTreeViewProps> = ({
   directoryHandle,
   currentPath,
   selectedPaths,
-  addFile,
-  removeFile,
+  updateFiles,
+  files,
   isRoot = false,
   level = 0,
   confirmLargeFile,
 }) => {
   const [isExpanded, setIsExpanded] = useState(isRoot)
   const [entries, setEntries] = useState<Array<[string, FileSystemHandle]>>([])
+  const [allFiles, setAllFiles] = useState<{ handle: FileSystemFileHandle; path: string }[]>([])
 
-  /**
-   * Fetches folder entries when expanded
-   */
+  // Fetch all files on mount, regardless of expansion
+  useEffect(() => {
+    const fetchAllFiles = async () => {
+      try {
+        const filesInDir = await getAllFilesInDirectory(directoryHandle, currentPath)
+        setAllFiles(filesInDir)
+      } catch (error) {
+        console.error(`Error fetching all files for ${directoryHandle.name}:`, error)
+        alert(`Failed to fetch files for ${directoryHandle.name}. Some operations may not work.`)
+      }
+    }
+    fetchAllFiles()
+  }, [directoryHandle, currentPath])
+
+  // Fetch visible entries only when expanded
   useEffect(() => {
     if (isExpanded) {
       const fetchEntries = async () => {
@@ -205,16 +229,75 @@ const FolderTreeView: React.FC<FolderTreeViewProps> = ({
     }
   }, [isExpanded, directoryHandle])
 
+  const folderCheckboxState = useMemo(() => {
+    if (allFiles.length === 0) return { checked: false, indeterminate: false }
+    const allSelected = allFiles.every((f) => selectedPaths.has(f.path))
+    const someSelected = allFiles.some((f) => selectedPaths.has(f.path))
+    return {
+      checked: allSelected,
+      indeterminate: someSelected && !allSelected,
+    }
+  }, [allFiles, selectedPaths])
+
+  const handleFolderCheckboxChange = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const checked = e.target.checked
+      const currentFiles = [...files]
+
+      if (checked) {
+        const newFilesToAdd: FileDataWithHandle[] = []
+        for (const { handle, path } of allFiles) {
+          if (!selectedPaths.has(path)) {
+            try {
+              const file = await handle.getFile()
+              let include = true
+              if (file.size > 10 * 1024 * 1024) {
+                include = await confirmLargeFile(file)
+              }
+              if (include) {
+                const contents = await readFileContents(file)
+                newFilesToAdd.push({ path, size: file.size, contents, handle })
+              }
+            } catch (error) {
+              console.error(`Error processing file ${path}:`, error)
+              alert(`Failed to process file ${path}. Continuing with remaining files.`)
+            }
+          }
+        }
+        if (newFilesToAdd.length > 0) {
+          updateFiles([...currentFiles, ...newFilesToAdd])
+        }
+      } else {
+        const pathsToKeep = currentFiles.filter(
+          (f) => !allFiles.some((af) => af.path === f.path)
+        )
+        updateFiles(pathsToKeep)
+      }
+    },
+    [allFiles, files, selectedPaths, updateFiles, confirmLargeFile]
+  )
+
   return (
     <div style={{ paddingLeft: isRoot ? 0 : 20 }}>
       {!isRoot && (
         <>
-          <button
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="text-blue-500 hover:text-blue-700"
-          >
-            {isExpanded ? "-" : "+"} {directoryHandle.name}
-          </button>
+          <div className="flex items-center space-x-2">
+            <input
+              type="checkbox"
+              checked={folderCheckboxState.checked}
+              ref={(el) => {
+                if (el) el.indeterminate = folderCheckboxState.indeterminate
+              }}
+              onChange={handleFolderCheckboxChange}
+              className="mr-2"
+            />
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="text-blue-500 hover:text-blue-700"
+            >
+              {isExpanded ? "-" : "+"} {directoryHandle.name}
+            </button>
+          </div>
           {isExpanded && entries.length > 0 && (
             <ul className="list-none">
               {entries.map(([name, handle]) =>
@@ -224,8 +307,8 @@ const FolderTreeView: React.FC<FolderTreeViewProps> = ({
                       directoryHandle={handle as FileSystemDirectoryHandle}
                       currentPath={currentPath + name + "/"}
                       selectedPaths={selectedPaths}
-                      addFile={addFile}
-                      removeFile={removeFile}
+                      updateFiles={updateFiles}
+                      files={files}
                       level={level + 1}
                       confirmLargeFile={confirmLargeFile}
                     />
@@ -236,8 +319,8 @@ const FolderTreeView: React.FC<FolderTreeViewProps> = ({
                     handle={handle as FileSystemFileHandle}
                     path={currentPath + name}
                     selectedPaths={selectedPaths}
-                    addFile={addFile}
-                    removeFile={removeFile}
+                    addFile={(fileData) => updateFiles([...files, fileData])}
+                    removeFile={(path) => updateFiles(files.filter((f) => f.path !== path))}
                     confirmLargeFile={confirmLargeFile}
                   />
                 )
@@ -255,8 +338,8 @@ const FolderTreeView: React.FC<FolderTreeViewProps> = ({
                   directoryHandle={handle as FileSystemDirectoryHandle}
                   currentPath={currentPath + name + "/"}
                   selectedPaths={selectedPaths}
-                  addFile={addFile}
-                  removeFile={removeFile}
+                  updateFiles={updateFiles}
+                  files={files}
                   level={level + 1}
                   confirmLargeFile={confirmLargeFile}
                 />
@@ -267,8 +350,8 @@ const FolderTreeView: React.FC<FolderTreeViewProps> = ({
                 handle={handle as FileSystemFileHandle}
                 path={currentPath + name}
                 selectedPaths={selectedPaths}
-                addFile={addFile}
-                removeFile={removeFile}
+                addFile={(fileData) => updateFiles([...files, fileData])}
+                removeFile={(path) => updateFiles(files.filter((f) => f.path !== path))}
                 confirmLargeFile={confirmLargeFile}
               />
             )
@@ -291,9 +374,6 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
   const [confirmFile, setConfirmFile] = useState<File | null>(null)
   const [resolveConfirm, setResolveConfirm] = useState<((value: boolean) => void) | null>(null)
 
-  /**
-   * Updates both local state and parent with new files including handles
-   */
   const updateFiles = useCallback(
     (newFiles: FileDataWithHandle[]) => {
       setFiles(newFiles)
@@ -302,39 +382,8 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
     [onFilesSelected]
   )
 
-  /**
-   * Adds a file to the selection, allowing duplicates
-   */
-  const addFile = useCallback(
-    (fileData: FileDataWithHandle) => {
-      const newFiles = [...files, fileData]
-      updateFiles(newFiles)
-    },
-    [files, updateFiles]
-  )
-
-  /**
-   * Removes all files with the specified path
-   * Note: May remove multiple instances if paths are duplicated (e.g., direct vs. folder selection)
-   */
-  const removeFile = useCallback(
-    (path: string) => {
-      const newFiles = files.filter((f) => f.path !== path)
-      updateFiles(newFiles)
-    },
-    [files, updateFiles]
-  )
-
-  /**
-   * Memoized set of selected file paths for efficient lookup
-   */
   const selectedPaths = useMemo(() => new Set(files.map((f) => f.path)), [files])
 
-  /**
-   * Prompts user to confirm inclusion of a large file (>10MB)
-   * @param file - The file to confirm
-   * @returns Promise resolving to true if included, false otherwise
-   */
   const confirmLargeFile = (file: File): Promise<boolean> => {
     return new Promise((resolve) => {
       setConfirmFile(file)
@@ -343,10 +392,6 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
     })
   }
 
-  /**
-   * Handles multiple file selection using showOpenFilePicker
-   * Silently ignores AbortError if the user cancels the file picker
-   */
   const handleSelectFiles = async () => {
     if (!window.showOpenFilePicker) {
       alert(
@@ -356,6 +401,7 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
     }
     try {
       const fileHandles = await window.showOpenFilePicker({ multiple: true })
+      const newFiles: FileDataWithHandle[] = []
       for (const handle of fileHandles) {
         const file = await handle.getFile()
         let include = true
@@ -364,9 +410,12 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
         }
         if (include) {
           const contents = await readFileContents(file)
-          const path = file.name // For direct selection, use file name
-          addFile({ path, size: file.size, contents, handle })
+          const path = file.name
+          newFiles.push({ path, size: file.size, contents, handle })
         }
+      }
+      if (newFiles.length > 0) {
+        updateFiles([...files, ...newFiles])
       }
     } catch (error: any) {
       if (error.name === "AbortError") {
@@ -377,10 +426,6 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
     }
   }
 
-  /**
-   * Handles folder selection, setting root folder and showing tree view
-   * Silently ignores AbortError if the user cancels the folder picker
-   */
   const handleSelectFolder = async () => {
     if (!window.showDirectoryPicker) {
       alert(
@@ -402,18 +447,12 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
     }
   }
 
-  /**
-   * Removes a file by index from the displayed list
-   */
   const removeFileByIndex = (index: number) => {
     const updatedFiles = files.filter((_, i) => i !== index)
     updateFiles(updatedFiles)
     console.log(`Removed file at index ${index} for selector ${id}. New files:`, updatedFiles)
   }
 
-  /**
-   * Formats file size in a human-readable format
-   */
   const formatFileSize = (size: number): string => {
     if (size < 1024) return `${size} B`
     if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
@@ -422,7 +461,6 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
 
   return (
     <div className="inline-block relative">
-      {/* Selection button */}
       <button
         onClick={() => setShowMenu(!showMenu)}
         className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 transition-colors"
@@ -430,7 +468,6 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
         {files.length > 0 ? "Change Files" : "Select Files"}
       </button>
 
-      {/* Dropdown menu */}
       {showMenu && (
         <div className="absolute z-10 bg-white dark:bg-gray-800 shadow-md rounded mt-2">
           <button
@@ -454,7 +491,6 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
         </div>
       )}
 
-      {/* Tree view */}
       {showTreeView && rootFolder && (
         <div className="mt-2 p-4 border rounded">
           <div className="flex justify-between items-center mb-2">
@@ -470,15 +506,14 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
             directoryHandle={rootFolder}
             currentPath=""
             selectedPaths={selectedPaths}
-            addFile={addFile}
-            removeFile={removeFile}
+            updateFiles={updateFiles}
+            files={files}
             isRoot={true}
             confirmLargeFile={confirmLargeFile}
           />
         </div>
       )}
 
-      {/* File list */}
       {files.length > 0 && (
         <div className="mt-2">
           <ul className="list-disc pl-5">
@@ -516,7 +551,6 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
         </div>
       )}
 
-      {/* Confirmation dialog for large files */}
       {showingConfirmation && confirmFile && (
         <Dialog
           open={showingConfirmation}

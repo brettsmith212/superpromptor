@@ -24,7 +24,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GHRC_PAT_SUPERPROMPTOR }}
+          password: ${{ secrets.GHCR_PAT_SUPERPROMPTOR }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
@@ -42,6 +42,7 @@ jobs:
         run: |
           echo "$SSH_PRIVATE_KEY" > private_key && chmod 600 private_key
           ssh -o StrictHostKeyChecking=no -i private_key ${DO_USERNAME}@${DO_HOST} '
+            echo "$GHCR_PAT_SUPERPROMPTOR" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             docker stop superpromptor || true
             docker rm superpromptor || true

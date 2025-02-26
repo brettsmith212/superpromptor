@@ -24,7 +24,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_PAT }}
+          password: ${{ secrets.GHRC_PAT_SUPERPROMPTOR }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v4

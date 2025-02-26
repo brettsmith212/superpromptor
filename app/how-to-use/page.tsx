@@ -1,19 +1,19 @@
 /**
  * @file How To Use page for SuperPromptor
- * @description 
- * This client-side page component provides static instructions on how to use 
- * the SuperPromptor application. It renders markdown content explaining the 
- * steps to upload a template, select files, and copy the output, fulfilling 
+ * @description
+ * This client-side page component provides static instructions on how to use
+ * the SuperPromptor application. It renders markdown content explaining the
+ * steps to upload a template, select files, and copy the output, fulfilling
  * the navigation requirement for an instructional page.
- * 
+ *
  * Key features:
  * - Renders static markdown instructions using react-markdown
  * - Styled with Tailwind CSS for readability and consistency with the design system
  * - Includes step-by-step usage instructions and additional feature notes
- * 
+ *
  * @dependencies
  * - react-markdown: For rendering markdown content in React
- * 
+ *
  * @notes
  * - Marked as "use client" to enable client-side rendering of react-markdown
  * - Markdown content is defined as a string within the component for simplicity
@@ -78,13 +78,13 @@ SuperPromptor is a tool designed to help you create prompts for large language m
         <ReactMarkdown
           components={{
             // Custom h2 styling for section headings
-            h2: ({ node, ...props }) => <h2 className="text-xl font-semibold mb-3" {...props} />,
+            h2: ({ ...props }) => <h2 className="text-xl font-semibold mb-3" {...props} />,
             // Paragraph styling for consistent spacing
-            p: ({ node, ...props }) => <p className="mb-4" {...props} />,
+            p: ({ ...props }) => <p className="mb-4" {...props} />,
             // Unordered list styling for bullet points
-            ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-4" {...props} />,
+            ul: ({ ...props }) => <ul className="list-disc pl-5 mb-4" {...props} />,
             // Inline code styling for all backticked content
-            code: ({ node, ...props }) => (
+            code: ({ ...props }) => (
               <code
                 className="inline bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-sm"
                 {...props}

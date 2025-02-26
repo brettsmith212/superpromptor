@@ -228,8 +228,8 @@ export default function TemplateDisplay() {
         dispatch({ type: "SET_SEGMENTS", payload: newSegments })
         dispatch({ type: "CLEAR_FILES" })
         setTemplateHandle(handle)
-      } catch (error: any) {
-        if (error.name === "AbortError") {
+      } catch (error: unknown) {
+        if (error instanceof DOMException && error.name === "AbortError") {
           return
         }
         console.error("Error selecting template:", error)

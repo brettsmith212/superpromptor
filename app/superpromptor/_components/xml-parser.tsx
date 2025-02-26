@@ -30,7 +30,7 @@ export default function XmlParser() {
       await applyChangesAction(xml, projectDirectory.trim());
       setXml("");
       setSuccessMessage("Changes applied successfully");
-    } catch (error: any) {
+    } catch {
       setErrorMessage("An error occurred while applying changes.");
     }
   };

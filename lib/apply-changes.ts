@@ -42,8 +42,8 @@ export async function applyFileChanges(change: FileChange, projectDirectory: str
 async function ensureDirectoryExists(dir: string) {
   try {
     await fs.mkdir(dir, { recursive: true });
-  } catch (error: any) {
-    if (error.code !== "EEXIST") {
+  } catch (error: unknown) {
+    if ((error as NodeJS.ErrnoException).code !== "EEXIST") {
       console.error(`Error creating directory ${dir}:`, error);
       throw error;
     }

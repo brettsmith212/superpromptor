@@ -1,8 +1,8 @@
 "use client"
 
 import { useState, useCallback, useMemo, useEffect } from "react"
-import { Plus, X } from "lucide-react"
-import type { FileData, FileDataWithHandle } from "@/types"
+import { X } from "lucide-react"
+import type { FileDataWithHandle } from "@/types"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 
@@ -383,8 +383,8 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
       if (newFiles.length > 0) {
         updateFiles([...files, ...newFiles])
       }
-    } catch (error: any) {
-      if (error.name === "AbortError") {
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === "AbortError") {
         return
       }
       console.error(`Error selecting files for selector ${id}:`, error)
@@ -404,8 +404,8 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
       setRootFolder(folderHandle)
       setShowTreeView(true)
       console.log(`Folder selected for selector ${id}:`, folderHandle.name)
-    } catch (error: any) {
-      if (error.name === "AbortError") {
+    } catch (error: unknown) {
+      if (error instanceof DOMException && error.name === "AbortError") {
         return
       }
       console.error(`Error selecting folder for selector ${id}:`, error)

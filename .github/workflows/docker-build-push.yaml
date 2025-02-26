@@ -42,10 +42,10 @@ jobs:
           GHCR_PAT_SUPERPROMPTOR: ${{ secrets.GHCR_PAT_SUPERPROMPTOR }}
         run: |
           echo "$SSH_PRIVATE_KEY" > private_key && chmod 600 private_key
-          ssh -o StrictHostKeyChecking=no -i private_key ${DO_USERNAME}@${DO_HOST} '
+          ssh -o StrictHostKeyChecking=no -i private_key ${DO_USERNAME}@${DO_HOST} <<EOF
             echo "$GHCR_PAT_SUPERPROMPTOR" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
             docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
             docker stop superpromptor || true
             docker rm superpromptor || true
             docker run -d -p 3001:3000 --name superpromptor --restart always ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          '
+          EOF

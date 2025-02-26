@@ -17,24 +17,6 @@
  * - Provides "Copy Contents To Clipboard" button to generate and copy the combined output
  * - Displays a disappearing alert for user feedback (e.g., "Template Refreshed", "Template Removed", "Copied to clipboard")
  * - Handles errors for non-.md uploads, file access issues, and clipboard operations
- *
- * @dependencies
- * - react: For state (useState, useCallback, useRef, useReducer) and event handling
- * - react-markdown: For rendering markdown segments
- * - rehype-highlight: For syntax highlighting in code blocks
- * - rehype-raw: For rendering HTML in markdown
- * - remark-gfm: For GitHub Flavored Markdown support (tables, strikethrough, etc.)
- * - ./file-selector: Client component for file selection buttons
- * - @/types: For FileDataWithHandle type
- * - framer-motion: For AnimatePresence to manage alert animations
- * - @/components/alert: Reusable alert component for feedback
- *
- * @notes
- * - Uses regex to ensure only exact `<superpromptor-file>` tags are replaced
- * - Stores FileSystemFileHandle for refresh functionality when available
- * - Falls back to prompting re-upload in browsers without File System Access API
- * - Buttons are styled with Tailwind per the design system
- * - Error handling covers file reading failures, invalid file types, and clipboard errors
  * - Silently ignores AbortError for user cancellations
  * - Alert animations require AnimatePresence in the parent component
  * - Refreshing updates both template and file contents, preserving file selections
@@ -43,7 +25,7 @@
 
 "use client"
 
-import React, { useState, useCallback, useRef, useReducer } from "react"
+import React, { useState, useCallback, useRef, useReducer, useMemo } from "react"
 import ReactMarkdown from "react-markdown"
 import rehypeHighlight from "rehype-highlight"
 import rehypeRaw from "rehype-raw"
@@ -52,6 +34,7 @@ import FileSelector from "./file-selector"
 import { FileDataWithHandle } from "@/types"
 import { AnimatePresence } from "framer-motion"
 import Alert from "@/components/alert"
+import { encodingForModel } from 'js-tiktoken'
 
 /**
  * Represents a segment of the template: either markdown text or a FileSelector component.
@@ -129,6 +112,27 @@ export default function TemplateDisplay() {
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
   const [alertType, setAlertType] = useState<"info" | "error">("info")
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const encoding = useMemo(() => encodingForModel('gpt-3.5-turbo'), [])
+
+  const totalTokens = useMemo(() => {
+    let count = 0
+    state.segments.forEach((segment) => {
+      if (segment.type === 'markdown') {
+        const tokens = encoding.encode(segment.content || '')
+        count += tokens.length
+      } else {
+        const selectedFiles = state.files.get(segment.id!) || []
+        selectedFiles.forEach((file) => {
+          const header = `-- ${file.path} --\n`
+          const fileText = header + (file.contents || '') + '\n'
+          const fileTokens = encoding.encode(fileText)
+          count += fileTokens.length
+        })
+      }
+    })
+    return count
+  }, [state.segments, state.files, encoding])
 
   /**
    * Parses the template content into segments of markdown and file selectors.
@@ -394,7 +398,12 @@ export default function TemplateDisplay() {
       {state.segments.length > 0 ? (
         <div>
           <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Template</h2>
+            <div className="flex items-center space-x-2">
+              <h2 className="text-xl font-semibold">Template</h2>
+              <span className="text-sm text-gray-500">
+                Total Tokens: {new Intl.NumberFormat().format(totalTokens)}
+              </span>
+            </div>
             <div className="space-x-2">
               <button
                 onClick={handleCopy}

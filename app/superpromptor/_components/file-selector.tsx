@@ -493,11 +493,28 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
 
       {files.length > 0 && (
         <div className="mt-2">
+          {!showTreeView && (
+            <div className="flex flex-col mb-4">
+              <button
+                onClick={() => {
+                  if (rootFolder) {
+                    setShowTreeView(true)
+                  } else {
+                    handleSelectFiles()
+                  }
+                }}
+                className="mt-2 text-blue-500 hover:text-white hover:bg-blue-500 transition-colors px-3 py-1 rounded-md"
+                aria-label="Add more files"
+              >
+                Add More Files
+              </button>
+            </div>
+          )}
           <ul className="list-disc pl-5">
             {files.map((file, index) => (
               <li
                 key={`${file.path}-${index}`}
-                className="flex items-center justify-between mb-1"
+                className="flex items-center justify-between mb-2"
               >
                 <span className="text-gray-700 dark:text-gray-300">
                   {file.path} ({formatFileSize(file.size)})
@@ -512,19 +529,6 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
               </li>
             ))}
           </ul>
-          <button
-            onClick={() => {
-              if (rootFolder) {
-                setShowTreeView(true)
-              } else {
-                handleSelectFiles()
-              }
-            }}
-            className="mt-2 text-blue-500 hover:text-blue-700 transition-colors"
-            aria-label="Add more files"
-          >
-            <Plus size={16} />
-          </button>
         </div>
       )}
 

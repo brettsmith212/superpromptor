@@ -1,45 +1,3 @@
-/**
- * @file File Selector component for SuperPromptor
- * @description
- * This client-side component handles file and folder selection for the SuperPromptor application.
- * It renders as a button within the markdown template where `<superpromptor-file>` tags are replaced, allowing
- * users to select multiple files or a folder. For folder selections, it displays a toggleable tree
- * view to select specific files, showing selected files with options to remove them and add more.
- * It includes logic to warn users about large files (>10MB) and ask for confirmation before inclusion.
- * It now passes file handles to the parent for refresh functionality and ensures folder-level checkboxes
- * correctly select/deselection all files recursively without requiring folder expansion.
- *
- * Key features:
- * - Button with dropdown to select multiple files or a folder
- * - Toggleable tree view for folder selections with recursive folder navigation
- * - Folder-level checkbox to select/deselect all files recursively without prior expansion
- * - Displays selected files with relative paths and sizes
- * - Allows removing individual files from the selection
- * - Plus sign button to reopen the tree view or file picker
- * - Updates button text to "Change Files" after selection
- * - Shows confirmation dialog for files larger than 10MB before inclusion
- * - Passes FileSystemFileHandle with FileData to parent for refreshing contents
- * - Handles file access errors gracefully
- * - Adds a "Clear Files" button to reset all selected files
- *
- * @dependencies
- * - react: For state management (useState, useCallback, useMemo, useEffect) and event handling
- * - lucide-react: For icons (Plus, X)
- * - @/types: For FileData and FileDataWithHandle types
- * - @/components/ui/dialog: For confirmation dialog (Shadcn UI)
- * - @/components/ui/button: For dialog buttons (Shadcn UI)
- *
- * @notes
- * - Uses File System Access API (showOpenFilePicker, showDirectoryPicker) with browser compatibility checks
- * - Tree view is recursive, fetching folder contents on expansion
- * - Paths are relative to the root folder when set; otherwise, use file names
- * - Allows multiple files with the same path (e.g., direct vs. folder selection); removal by path may remove all instances
- * - Error handling silently ignores AbortError for user cancellations, alerts for other issues
- * - Large file warnings are handled via a confirmation dialog using Shadcn UI components
- * - Handles are null for files selected via input fallback, limiting refresh capability in those cases
- * - Folder checkboxes now correctly handle recursive selection/deselection without requiring "+" click
- */
-
 "use client"
 
 import { useState, useCallback, useMemo, useEffect } from "react"
@@ -511,13 +469,14 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
 
       {showTreeView && rootFolder && (
         <div className="mt-2 p-4 border rounded">
-          <div className="flex justify-between items-center mb-2">
+          <div className="flex justify-between items-center mb-2 space-x-4">
             <h3 className="text-lg font-semibold">Select files from {rootFolder.name}</h3>
             <button
               onClick={() => setShowTreeView(false)}
-              className="text-red-500 hover:text-red-700"
+              className="w-6 h-6 flex items-center justify-center bg-red-500 text-white rounded-full hover:bg-red-600 active:bg-red-700 transition-colors duration-150"
+              aria-label="Close tree view"
             >
-              <X size={16} />
+              <X size={14} />
             </button>
           </div>
           <FolderTreeView
@@ -545,10 +504,10 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
                 </span>
                 <button
                   onClick={() => removeFileByIndex(index)}
-                  className="ml-2 text-red-500 hover:text-red-700 transition-colors"
+                  className="ml-2 w-6 h-6 flex items-center justify-center bg-red-500 text-white rounded-full hover:bg-red-600 active:bg-red-700 transition-colors duration-150"
                   aria-label={`Remove ${file.path}`}
                 >
-                  <X size={16} />
+                  <X size={14} />
                 </button>
               </li>
             ))}

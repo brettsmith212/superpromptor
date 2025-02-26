@@ -14,6 +14,7 @@
  * @dependencies
  * - next/font/google: For loading Inter font
  * - app/globals.css: Global styles applied to the body
+ * - app/styles/highlight.css: Styles for syntax highlighting in code blocks
  * - components/navigation-panel: Client-side navigation component included here
  *
  * @notes
@@ -28,6 +29,7 @@
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
+import "./styles/highlight.css"
 import NavigationPanel from "@/components/navigation-panel"
 
 const inter = Inter({

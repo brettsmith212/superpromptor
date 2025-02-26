@@ -10,7 +10,16 @@ You will see <ai_context> tags in the code. These are context tags that you shou
 
 ## Overview
 
-This is a web app template.
+- **Core Purpose and Value Proposition**: SuperPromptor is a web application that simplifies the creation of prompts for large language models (LLMs) by allowing developers to upload markdown templates with `<file>` tags, replace them with file contents via an intuitive UI, and copy the result to the clipboard. It eliminates manual file content insertion, enhancing productivity.
+- **Key Workflows**:
+  1. User uploads a `.md` template.
+  2. App renders the template as markdown, replacing `<file>` tags with buttons.
+  3. User selects files/folders, previews selections, and adjusts as needed.
+  4. User copies the combined output to the clipboard.
+- **System Architecture**:
+  - Frontend: Next.js with server components for initial rendering and client components for interactivity.
+  - No backend persistence; relies on browser File System Access API and Clipboard API.
+  - Tech Stack: Next.js, Tailwind CSS, Shadcn UI, Framer Motion.
 
 ## Tech Stack
 

@@ -21,6 +21,9 @@
  * @dependencies
  * - react: For state (useState, useCallback, useRef, useReducer) and event handling
  * - react-markdown: For rendering markdown segments
+ * - rehype-highlight: For syntax highlighting in code blocks
+ * - rehype-raw: For rendering HTML in markdown
+ * - remark-gfm: For GitHub Flavored Markdown support (tables, strikethrough, etc.)
  * - ./file-selector: Client component for file selection buttons
  * - @/types: For FileDataWithHandle type
  * - framer-motion: For AnimatePresence to manage alert animations
@@ -42,6 +45,9 @@
 
 import React, { useState, useCallback, useRef, useReducer } from "react"
 import ReactMarkdown from "react-markdown"
+import rehypeHighlight from "rehype-highlight"
+import rehypeRaw from "rehype-raw"
+import remarkGfm from "remark-gfm"
 import FileSelector from "./file-selector"
 import { FileDataWithHandle } from "@/types"
 import { AnimatePresence } from "framer-motion"
@@ -360,9 +366,11 @@ export default function TemplateDisplay() {
     return state.segments.map((segment, index) => {
       if (segment.type === "markdown") {
         return (
-          <div key={`markdown-${index}`} className="inline">
+          <div key={`markdown-${index}`} className="markdown-container">
             <ReactMarkdown
-              className="prose dark:prose-invert inline max-w-none"
+              className="prose dark:prose-invert max-w-none prose-pre:bg-gray-800 prose-pre:p-4 prose-pre:rounded prose-code:text-red-500 prose-headings:text-blue-600 dark:prose-headings:text-blue-400 prose-a:text-blue-500 hover:prose-a:text-blue-700 dark:prose-a:text-blue-400 dark:hover:prose-a:text-blue-300 prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-4 prose-blockquote:italic prose-img:rounded-lg"
+              rehypePlugins={[rehypeHighlight, rehypeRaw]}
+              remarkPlugins={[remarkGfm]}
             >
               {segment.content!}
             </ReactMarkdown>

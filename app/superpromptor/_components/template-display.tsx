@@ -397,6 +397,12 @@ export default function TemplateDisplay() {
             <h2 className="text-xl font-semibold">Template</h2>
             <div className="space-x-2">
               <button
+                onClick={handleCopy}
+                className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Copy Contents To Clipboard
+              </button>
+              <button
                 onClick={handleRefresh}
                 className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
               >

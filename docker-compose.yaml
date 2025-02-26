@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  superpromptor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: superpromptor
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - NEXT_TELEMETRY_DISABLED=1
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    # Add volumes if you need to persist data
+    # volumes:
+    #   - ./data:/app/data

@@ -55,18 +55,20 @@ SuperPromptor is a tool designed to help you create prompts for large language m
 export const XMLParserMarkdown = `
 ## Steps to Use XML Code Parser
 
-1. **How to Add XML Instructions to a Template**
-   - To add XML instructions to a template (source: McKay Wrigley of https://www.jointakeoff.com/prompts)
+1. **Copy XML Instructions to a Template**
+   - source: McKay Wrigley of https://www.jointakeoff.com/prompts
 
-XML Section:
-   - Do not get lazy. Always output the full code in the XML section.
-   - Enclose this entire section in a markdown codeblock
-   - Include all of the changed files
-   - Specify each file operation with CREATE, UPDATE, or DELETE
-   - For CREATE or UPDATE operations, include the full file code
-   - Include the full file path (relative to the project directory, good: app/page.tsx, bad: /Users/username/Desktop/projects/new-chat-template/app/page.tsx)
-   - Enclose the code with ![CDATA[__CODE HERE__]]
-   - Use the following XML structure:
+**START COPY**
+
+   - XML Section:
+      - Do not get lazy. Always output the full code in the XML section.
+      - Enclose this entire section in a markdown codeblock
+      - Include all of the changed files
+      - Specify each file operation with CREATE, UPDATE, or DELETE
+      - For CREATE or UPDATE operations, include the full file code
+      - Include the full file path (relative to the project directory, good: app/page.tsx, bad: /Users/username/Desktop/projects/new-chat-template/app/page.tsx)
+      - Enclose the code with ![CDATA[__CODE HERE__]]
+      - Use the following XML structure:
 
 \`\`\`xml
 <code_changes>
@@ -83,12 +85,14 @@ __FULL FILE CODE HERE__
 </code_changes>
 \`\`\`
 
-1. **Select a Project Directory**
+**END COPY**
+
+2. **Select a Project Directory**
    - The directory chosen will be where the code changes are inserted.
 
-2. **Paste XML Code Changes**
+3. **Paste XML Code Changes**
    - Paste the XML code changes into the textarea.
 
-3. **Apply Changes**
+4. **Apply Changes**
    - Click "Apply Changes" to insert the changes into the selected project directory.
 `

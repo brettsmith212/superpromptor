@@ -42,7 +42,7 @@ export default function HowToUsePage() {
         <h1 className="text-3xl font-bold mb-6">How To Use SuperPromptor</h1>
         {/* Markdown rendered content with custom styling */}
         <ReactMarkdown
-          className="prose dark:prose-invert max-w-none prose-pre:bg-gray-700 prose-pre:p-4 prose-pre:rounded prose-code:text-red-500 prose-headings:text-blue-600 dark:prose-headings:text-blue-400 prose-a:text-blue-500 hover:prose-a:text-blue-700 dark:prose-a:text-blue-400 dark:hover:prose-a:text-blue-300 prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-4 prose-blockquote:italic prose-img:rounded-lg"
+          className="prose dark:prose-invert max-w-none prose-pre:bg-gray-700 prose-pre:p-4 prose-pre:rounded prose-code:text-red-500 prose-headings:text-black-600 dark:prose-headings:text-black-400 prose-a:text-black-500 hover:prose-a:text-black-700 dark:prose-a:text-black-400 dark:hover:prose-a:text-black-300 prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-4 prose-blockquote:italic prose-img:rounded-lg"
           rehypePlugins={[rehypeHighlight, rehypeRaw]}
           remarkPlugins={[remarkGfm]}
         >
@@ -51,7 +51,7 @@ export default function HowToUsePage() {
         <h1 className="text-3xl font-bold mb-6 mt-8">How To Use XML Code Parser</h1>
         {/* Markdown rendered content with custom styling */}
         <ReactMarkdown
-          className="prose dark:prose-invert max-w-none prose-pre:bg-gray-700 prose-pre:p-4 prose-pre:rounded prose-code:text-red-500 prose-headings:text-blue-600 dark:prose-headings:text-blue-400 prose-a:text-blue-500 hover:prose-a:text-blue-700 dark:prose-a:text-blue-400 dark:hover:prose-a:text-blue-300 prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-4 prose-blockquote:italic prose-img:rounded-lg"
+          className="prose dark:prose-invert max-w-none prose-pre:bg-gray-700 prose-pre:p-4 prose-pre:rounded prose-code:text-red-500 prose-headings:text-black-600 dark:prose-headings:text-black-400 prose-a:text-black-500 hover:prose-a:text-black-700 dark:prose-a:text-black-400 dark:hover:prose-a:text-black-300 prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-4 prose-blockquote:italic prose-img:rounded-lg"
           rehypePlugins={[rehypeHighlight, rehypeRaw]}
           remarkPlugins={[remarkGfm]}
         >

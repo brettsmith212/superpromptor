@@ -25,7 +25,7 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { parseXmlString, ParsedFileChange } from "@/lib/xml-parser"
 
 async function applyChange(directoryHandle: FileSystemDirectoryHandle, change: ParsedFileChange) {
@@ -60,31 +60,15 @@ export default function XmlParser() {
   const [successMessage, setSuccessMessage] = useState<string>("")
   const [errorMessage, setErrorMessage] = useState<string>("")
 
-  useEffect(() => {
-    let timer: NodeJS.Timeout
-    if (successMessage) {
-      timer = setTimeout(() => {
-        setSuccessMessage("")
-      }, 2000)
-    }
-    return () => {
-      if (timer) clearTimeout(timer)
-    }
-  }, [successMessage])
-
   const handleSelectDirectory = async () => {
     try {
       const handle = await window.showDirectoryPicker()
       setDirectoryHandle(handle)
       setErrorMessage("") // Clear any previous error message
-      setSuccessMessage(`Selected directory: ${handle.name}`)
     } catch (error) {
-      // Only handle errors that are NOT AbortError (user canceled)
       if (error instanceof DOMException && error.name === "AbortError") {
-        // User canceled the picker; silently return without setting an error
         return
       }
-      // For other errors, log and display an error message
       console.error("Error selecting directory:", error)
       setErrorMessage("Failed to select directory")
     }

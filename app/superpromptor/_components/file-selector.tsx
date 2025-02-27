@@ -150,7 +150,6 @@ const FolderTreeView: React.FC<FolderTreeViewProps> = ({
   const [entries, setEntries] = useState<Array<[string, FileSystemHandle]>>([])
   const [allFiles, setAllFiles] = useState<{ handle: FileSystemFileHandle; path: string }[]>([])
 
-  // Fetch all files on mount, regardless of expansion
   useEffect(() => {
     const fetchAllFiles = async () => {
       try {
@@ -164,7 +163,6 @@ const FolderTreeView: React.FC<FolderTreeViewProps> = ({
     fetchAllFiles()
   }, [directoryHandle, currentPath])
 
-  // Fetch visible entries only when expanded
   useEffect(() => {
     if (isExpanded) {
       const fetchEntries = async () => {
@@ -471,13 +469,13 @@ export default function FileSelector({ id, onFilesSelected }: FileSelectorProps)
         <div className="mt-2 p-4 border rounded">
           <div className="flex justify-between items-center mb-2 space-x-4">
             <h3 className="text-lg font-semibold">Select files from {rootFolder.name}</h3>
-            <button
+            <Button
+              variant="destructive"
+              size="sm"
               onClick={() => setShowTreeView(false)}
-              className="w-6 h-6 flex items-center justify-center bg-red-500 text-white rounded-full hover:bg-red-600 active:bg-red-700 transition-colors duration-150"
-              aria-label="Close tree view"
             >
-              <X size={14} />
-            </button>
+              Close
+            </Button>
           </div>
           <FolderTreeView
             directoryHandle={rootFolder}

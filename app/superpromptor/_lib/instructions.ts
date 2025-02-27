@@ -56,7 +56,7 @@ export const XMLParserMarkdown = `
 ## Steps to Use XML Code Parser
 
 1. **How to Add XML Instructions to a Template**
-   - To add XML instructions to a template:
+   - To add XML instructions to a template (source: McKay Wrigley of https://www.jointakeoff.com/prompts)
 
 XML Section:
    - Do not get lazy. Always output the full code in the XML section.

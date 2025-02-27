@@ -26,6 +26,9 @@
 "use client"
 
 import ReactMarkdown from 'react-markdown'
+import rehypeHighlight from "rehype-highlight"
+import rehypeRaw from "rehype-raw"
+import remarkGfm from "remark-gfm"
 
 export default function HowToUsePage() {
   // Markdown content explaining how to use SuperPromptor
@@ -65,7 +68,7 @@ SuperPromptor is a tool designed to help you create prompts for large language m
 - Only \`.md\` files are supported for templates.
 - Files larger than 10MB will trigger a warning; you can choose to include or exclude them.
 - The output format for each file is: \`-- relative/path/filename --\\n[file contents]\\n\`
-  `
+`
 const XMLParserMarkdown = `
 ## Steps to Use XML Code Parser
 
@@ -77,7 +80,6 @@ const XMLParserMarkdown = `
 
 3. **Apply Changes**
    - Click "Apply Changes" to insert the changes into the selected project directory.
-
 `
 
   return (
@@ -89,42 +91,18 @@ const XMLParserMarkdown = `
         <h1 className="text-3xl font-bold mb-6">How To Use SuperPromptor</h1>
         {/* Markdown rendered content with custom styling */}
         <ReactMarkdown
-          components={{
-            // Custom h2 styling for section headings
-            h2: ({ ...props }) => <h2 className="text-xl font-semibold mb-3" {...props} />,
-            // Paragraph styling for consistent spacing
-            p: ({ ...props }) => <p className="mb-4" {...props} />,
-            // Unordered list styling for bullet points
-            ul: ({ ...props }) => <ul className="list-disc pl-5 mb-4" {...props} />,
-            // Inline code styling for all backticked content
-            code: ({ ...props }) => (
-              <code
-                className="inline bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-sm"
-                {...props}
-              />
-            ),
-          }}
+          className="prose dark:prose-invert max-w-none prose-pre:bg-gray-700 prose-pre:p-4 prose-pre:rounded prose-code:text-red-500 prose-headings:text-blue-600 dark:prose-headings:text-blue-400 prose-a:text-blue-500 hover:prose-a:text-blue-700 dark:prose-a:text-blue-400 dark:hover:prose-a:text-blue-300 prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-4 prose-blockquote:italic prose-img:rounded-lg"
+          rehypePlugins={[rehypeHighlight, rehypeRaw]}
+          remarkPlugins={[remarkGfm]}
         >
           {TemplateEditorMarkdown}
         </ReactMarkdown>
-        <h1 className="text-3xl font-bold mb-6">How To Use XML Code Parser</h1>
+        <h1 className="text-3xl font-bold mb-6 mt-8">How To Use XML Code Parser</h1>
         {/* Markdown rendered content with custom styling */}
         <ReactMarkdown
-          components={{
-            // Custom h2 styling for section headings
-            h2: ({ ...props }) => <h2 className="text-xl font-semibold mb-3" {...props} />,
-            // Paragraph styling for consistent spacing
-            p: ({ ...props }) => <p className="mb-4" {...props} />,
-            // Unordered list styling for bullet points
-            ul: ({ ...props }) => <ul className="list-disc pl-5 mb-4" {...props} />,
-            // Inline code styling for all backticked content
-            code: ({ ...props }) => (
-              <code
-                className="inline bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-sm"
-                {...props}
-              />
-            ),
-          }}
+          className="prose dark:prose-invert max-w-none prose-pre:bg-gray-700 prose-pre:p-4 prose-pre:rounded prose-code:text-red-500 prose-headings:text-blue-600 dark:prose-headings:text-blue-400 prose-a:text-blue-500 hover:prose-a:text-blue-700 dark:prose-a:text-blue-400 dark:hover:prose-a:text-blue-300 prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-4 prose-blockquote:italic prose-img:rounded-lg"
+          rehypePlugins={[rehypeHighlight, rehypeRaw]}
+          remarkPlugins={[remarkGfm]}
         >
           {XMLParserMarkdown}
         </ReactMarkdown>

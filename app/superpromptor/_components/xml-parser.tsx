@@ -27,6 +27,12 @@
 
 import { useState } from "react"
 import { parseXmlString, ParsedFileChange } from "@/lib/xml-parser"
+import { Button } from "@/components/ui/button"
+import ReactMarkdown from "react-markdown"
+import rehypeHighlight from "rehype-highlight"
+import rehypeRaw from "rehype-raw"
+import remarkGfm from "remark-gfm"
+import { XMLParserMarkdown } from "../_lib/instructions"
 
 async function applyChange(directoryHandle: FileSystemDirectoryHandle, change: ParsedFileChange) {
   const { file_operation, file_path, file_code } = change
@@ -59,6 +65,7 @@ export default function XmlParser() {
   const [directoryHandle, setDirectoryHandle] = useState<FileSystemDirectoryHandle | null>(null)
   const [successMessage, setSuccessMessage] = useState<string>("")
   const [errorMessage, setErrorMessage] = useState<string>("")
+  const [isInstructionsOpen, setIsInstructionsOpen] = useState(false)
 
   const handleSelectDirectory = async () => {
     try {
@@ -106,6 +113,27 @@ export default function XmlParser() {
     <div className="max-w-xl w-full mx-auto p-4 flex flex-col gap-4">
       {errorMessage && <div className="text-red-400">{errorMessage}</div>}
       {successMessage && <div className="text-green-400">{successMessage}</div>}
+      <div>
+        <Button
+          variant="outline"
+          onClick={() => setIsInstructionsOpen(!isInstructionsOpen)}
+          className="w-full flex justify-between items-center"
+        >
+          <span className="mr-2">{isInstructionsOpen ? "▼" : "▶"}</span>
+          How to Use XML Parser
+        </Button>
+        {isInstructionsOpen && (
+          <div className="mt-2 p-4 bg-gray-100 dark:bg-gray-800 rounded">
+            <ReactMarkdown
+              className="prose dark:prose-invert max-w-none prose-pre:bg-gray-700 prose-pre:p-4 prose-pre:rounded prose-code:text-red-500 prose-headings:text-blue-600 dark:prose-headings:text-blue-400 prose-a:text-blue-500 hover:prose-a:text-blue-700 dark:prose-a:text-blue-400 dark:hover:prose-a:text-blue-300 prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-4 prose-blockquote:italic prose-img:rounded-lg"
+              rehypePlugins={[rehypeHighlight, rehypeRaw]}
+              remarkPlugins={[remarkGfm]}
+            >
+              {XMLParserMarkdown}
+            </ReactMarkdown>
+          </div>
+        )}
+      </div>
       <button
         className="bg-blue-500 text-white p-2 rounded-md hover:bg-blue-600 transition-colors"
         onClick={handleSelectDirectory}

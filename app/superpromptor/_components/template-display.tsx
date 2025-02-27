@@ -35,6 +35,8 @@ import { FileDataWithHandle } from "@/types"
 import { AnimatePresence } from "framer-motion"
 import Alert from "@/components/alert"
 import { encodingForModel } from 'js-tiktoken'
+import { TemplateEditorMarkdown } from "../_lib/instructions"
+import { Button } from "@/components/ui/button"
 
 /**
  * Represents a segment of the template: either markdown text or a FileSelector component.
@@ -111,6 +113,7 @@ export default function TemplateDisplay() {
   const [templateHandle, setTemplateHandle] = useState<FileSystemFileHandle | null>(null)
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
   const [alertType, setAlertType] = useState<"info" | "error">("info")
+  const [isInstructionsOpen, setIsInstructionsOpen] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const encoding = useMemo(() => encodingForModel('gpt-3.5-turbo'), [])
@@ -127,7 +130,7 @@ export default function TemplateDisplay() {
           const header = `-- ${file.path} --\n`
           const fileText = header + (file.contents || '') + '\n'
           const fileTokens = encoding.encode(fileText)
-          count += fileTokens.length
+          count += tokens.length
         })
       }
     })
@@ -438,12 +441,35 @@ export default function TemplateDisplay() {
           </div>
         </div>
       ) : (
-        <button
-          onClick={handleUpload}
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
-          Upload Template
-        </button>
+        <div className="flex flex-col gap-4">
+          <button
+            onClick={handleUpload}
+            className="w-fit px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Upload Template
+          </button>
+          <div>
+            <Button
+              variant="outline"
+              onClick={() => setIsInstructionsOpen(!isInstructionsOpen)}
+              className="w-full flex justify-between items-center"
+            >
+              <span className="mr-2">{isInstructionsOpen ? "▼" : "▶"}</span>
+              How to Use Template Prompt Editor
+            </Button>
+            {isInstructionsOpen && (
+              <div className="mt-2 p-4 bg-gray-100 dark:bg-gray-800 rounded">
+                <ReactMarkdown
+                  className="prose dark:prose-invert max-w-none prose-pre:bg-gray-700 prose-pre:p-4 prose-pre:rounded prose-code:text-red-500 prose-headings:text-blue-600 dark:prose-headings:text-blue-400 prose-a:text-blue-500 hover:prose-a:text-blue-700 dark:prose-a:text-blue-400 dark:hover:prose-a:text-blue-300 prose-blockquote:border-l-4 prose-blockquote:border-gray-300 prose-blockquote:pl-4 prose-blockquote:italic prose-img:rounded-lg"
+                  rehypePlugins={[rehypeHighlight, rehypeRaw]}
+                  remarkPlugins={[remarkGfm]}
+                >
+                  {TemplateEditorMarkdown}
+                </ReactMarkdown>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       <input

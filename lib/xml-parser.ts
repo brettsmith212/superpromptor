@@ -1,6 +1,24 @@
-import { DOMParser } from "@xmldom/xmldom";
+/**
+ * @file XML Parser utility for SuperPromptor
+ * @description 
+ * This file provides a utility function to parse XML strings containing code change instructions
+ * for the SuperPromptor application. It defines the structure of parsed file changes and processes
+ * XML into an array of change objects.
+ * 
+ * Key features:
+ * - Parses XML with <changed_files> and <file> nodes into ParsedFileChange objects
+ * - Handles missing or malformed XML gracefully by returning null
+ * - Supports file_summary, file_operation, file_path, and optional file_code fields
+ * 
+ * @dependencies
+ * - None (uses native DOMParser in the browser)
+ * 
+ * @notes
+ * - Previously used @xmldom/xmldom for Node.js compatibility; now uses window.DOMParser for client-side execution
+ * - Assumes XML is well-formed with expected tags; skips invalid <file> nodes
+ */
 
-interface ParsedFileChange {
+export interface ParsedFileChange {
   file_summary: string;
   file_operation: string;
   file_path: string;
@@ -9,7 +27,7 @@ interface ParsedFileChange {
 
 export async function parseXmlString(xmlString: string): Promise<ParsedFileChange[] | null> {
   try {
-    const parser = new DOMParser();
+    const parser = new window.DOMParser();
     const doc = parser.parseFromString(xmlString, "text/xml");
 
     const changedFilesNode = doc.getElementsByTagName("changed_files")[0];
@@ -45,7 +63,7 @@ export async function parseXmlString(xmlString: string): Promise<ParsedFileChang
         file_summary,
         file_operation,
         file_path,
-        file_code
+        file_code,
       });
     }
 

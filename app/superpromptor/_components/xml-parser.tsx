@@ -117,10 +117,10 @@ export default function XmlParser() {
         <Button
           variant="outline"
           onClick={() => setIsInstructionsOpen(!isInstructionsOpen)}
-          className="w-full flex justify-between items-center"
+          className="w-full flex justify-start items-center"
         >
           <span className="mr-2">{isInstructionsOpen ? "▼" : "▶"}</span>
-          How to Use XML Parser
+          How to Use XML Code Parser
         </Button>
         {isInstructionsOpen && (
           <div className="mt-2 p-4 bg-gray-100 dark:bg-gray-800 rounded">

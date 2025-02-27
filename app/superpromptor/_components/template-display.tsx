@@ -130,7 +130,7 @@ export default function TemplateDisplay() {
           const header = `-- ${file.path} --\n`
           const fileText = header + (file.contents || '') + '\n'
           const fileTokens = encoding.encode(fileText)
-          count += tokens.length
+          count += fileTokens.length
         })
       }
     })
@@ -452,7 +452,7 @@ export default function TemplateDisplay() {
             <Button
               variant="outline"
               onClick={() => setIsInstructionsOpen(!isInstructionsOpen)}
-              className="w-full flex justify-between items-center"
+              className="w-fit flex justify-start items-center"
             >
               <span className="mr-2">{isInstructionsOpen ? "▼" : "▶"}</span>
               How to Use Template Prompt Editor

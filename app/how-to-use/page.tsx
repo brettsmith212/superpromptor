@@ -29,7 +29,7 @@ import ReactMarkdown from 'react-markdown'
 
 export default function HowToUsePage() {
   // Markdown content explaining how to use SuperPromptor
-  const markdown = `
+  const TemplateEditorMarkdown = `
 SuperPromptor is a tool designed to help you create prompts for large language models (LLMs) by combining a markdown template with file contents.
 
 ## Steps to Use SuperPromptor
@@ -37,10 +37,10 @@ SuperPromptor is a tool designed to help you create prompts for large language m
 1. **Upload a Markdown Template**
    - Click on the "Upload Template" button on the main page.
    - Select a \`.md\` file from your local file system.
-   - The template should contain \`<file>\` tags where you want to insert file contents.
+   - The markdown template should contain \`<superpromptor-file>\` tags where you want to insert file contents.
 
 2. **Select Files or Folders**
-   - For each \`<file>\` tag in your template, a "Select Files" button will appear.
+   - For each \`<superpromptor-file>\` tag in your markdown template, a "Select Files" button will appear.
    - Click on "Select Files" to choose files or folders to include.
    - You can select multiple files or an entire folder.
    - If you select a folder, a tree view will allow you to choose specific files or subfolders.
@@ -57,7 +57,7 @@ SuperPromptor is a tool designed to help you create prompts for large language m
 
 ## Additional Features
 
-- **Refresh Template**: If you've updated your template file, click "Refresh" to reload it. This will clear all selected files.
+- **Refresh Template**: If you've updated your template file, click "Refresh" to reload it.
 - **Remove Template**: Click "Remove" to clear the uploaded template and reset the app.
 
 ## Notes
@@ -66,6 +66,19 @@ SuperPromptor is a tool designed to help you create prompts for large language m
 - Files larger than 10MB will trigger a warning; you can choose to include or exclude them.
 - The output format for each file is: \`-- relative/path/filename --\\n[file contents]\\n\`
   `
+const XMLParserMarkdown = `
+## Steps to Use XML Code Parser
+
+1. **Select a Project Directory**
+   - The directory chosen will be where the code changes are inserted.
+
+2. **Paste XML Code Changes**
+   - Paste the XML code changes into the textarea.
+
+3. **Apply Changes**
+   - Click "Apply Changes" to insert the changes into the selected project directory.
+
+`
 
   return (
     // Outer container matching layout padding and full height
@@ -92,7 +105,28 @@ SuperPromptor is a tool designed to help you create prompts for large language m
             ),
           }}
         >
-          {markdown}
+          {TemplateEditorMarkdown}
+        </ReactMarkdown>
+        <h1 className="text-3xl font-bold mb-6">How To Use XML Code Parser</h1>
+        {/* Markdown rendered content with custom styling */}
+        <ReactMarkdown
+          components={{
+            // Custom h2 styling for section headings
+            h2: ({ ...props }) => <h2 className="text-xl font-semibold mb-3" {...props} />,
+            // Paragraph styling for consistent spacing
+            p: ({ ...props }) => <p className="mb-4" {...props} />,
+            // Unordered list styling for bullet points
+            ul: ({ ...props }) => <ul className="list-disc pl-5 mb-4" {...props} />,
+            // Inline code styling for all backticked content
+            code: ({ ...props }) => (
+              <code
+                className="inline bg-gray-100 dark:bg-gray-700 px-1 py-0.5 rounded text-sm"
+                {...props}
+              />
+            ),
+          }}
+        >
+          {XMLParserMarkdown}
         </ReactMarkdown>
       </div>
     </div>

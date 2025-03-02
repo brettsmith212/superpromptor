@@ -298,53 +298,68 @@ export default function TemplateDisplay({ starterTemplates }: { starterTemplates
   }
 
   /**
-   * Handles the Refresh button click to reload the template and all selected file contents from the filesystem.
-   * Preserves the file selections while updating their contents if handles are available.
+   * Handles the Refresh button click to reload the template (if uploaded) and all selected file contents from the filesystem.
+   * For starter templates, refreshes only selected files if present. Preserves file selections and input values while updating file contents if handles are available.
+   * If nothing can be refreshed, completes silently without error.
    */
   const handleRefresh = async () => {
-    if (!templateHandle) {
-      setAlertMessage("Please re-upload the template to refresh.")
-      setAlertType("error")
-      return
-    }
     try {
-      // Refresh the template
-      const templateFile = await templateHandle.getFile()
-      const templateContent = await templateFile.text()
-      const newSegments = parseTemplate(templateContent)
+      let templateRefreshed = false
+      let filesRefreshed = false
 
-      // Refresh all selected file contents
-      const updatedFiles = new Map<string, FileDataWithHandle[]>()
-      for (const [tagId, files] of state.files) {
-        const refreshedFiles = await Promise.all(
-          files.map(async (fileData) => {
-            if (fileData.handle) {
-              try {
-                const file = await fileData.handle.getFile()
-                const contents = await readFileContents(file)
-                return { ...fileData, size: file.size, contents }
-              } catch (error) {
-                console.error(`Error refreshing file ${fileData.path}:`, error)
-                setAlertMessage(`Failed to refresh file: ${fileData.path}`)
-                setAlertType("error")
-                return fileData // Keep old data if refresh fails
+      // Refresh the template if an uploaded template handle exists
+      if (templateHandle) {
+        const templateFile = await templateHandle.getFile()
+        const templateContent = await templateFile.text()
+        const newSegments = parseTemplate(templateContent)
+        dispatch({ type: "SET_SEGMENTS", payload: newSegments })
+        templateRefreshed = true
+      }
+
+      // Refresh all selected file contents if any files are selected
+      if (state.files.size > 0) {
+        const updatedFiles = new Map<string, FileDataWithHandle[]>()
+        for (const [tagId, files] of state.files) {
+          const refreshedFiles = await Promise.all(
+            files.map(async (fileData) => {
+              if (fileData.handle) {
+                try {
+                  const file = await fileData.handle.getFile()
+                  const contents = await readFileContents(file)
+                  filesRefreshed = true
+                  return { ...fileData, size: file.size, contents }
+                } catch (error) {
+                  console.error(`Error refreshing file ${fileData.path}:`, error)
+                  setAlertMessage(`Failed to refresh file: ${fileData.path}`)
+                  setAlertType("error")
+                  return fileData // Keep old data if refresh fails
+                }
               }
-            }
-            return fileData // No handle, keep as-is
-          })
-        )
-        updatedFiles.set(tagId, refreshedFiles)
+              return fileData // No handle, keep as-is
+            })
+          )
+          updatedFiles.set(tagId, refreshedFiles)
+        }
+
+        // Update state with refreshed files
+        for (const [tagId, files] of updatedFiles) {
+          dispatch({ type: "SET_FILES", payload: { tagId, files } })
+        }
       }
 
-      // Update state with refreshed template and files
-      dispatch({ type: "SET_SEGMENTS", payload: newSegments })
-      for (const [tagId, files] of updatedFiles) {
-        dispatch({ type: "SET_FILES", payload: { tagId, files } })
+      // Set appropriate success message based on what was refreshed
+      if (templateRefreshed && filesRefreshed) {
+        setAlertMessage("Template and files refreshed")
+        setAlertType("info")
+      } else if (templateRefreshed) {
+        setAlertMessage("Template refreshed")
+        setAlertType("info")
+      } else if (filesRefreshed) {
+        setAlertMessage("Files refreshed")
+        setAlertType("info")
       }
-      dispatch({ type: "CLEAR_INPUTS" })
+      // If neither template nor files were refreshed (e.g., no files selected), do nothing silently
 
-      setAlertMessage("Template and files refreshed")
-      setAlertType("info")
     } catch (error) {
       console.error("Error during refresh:", error)
       setAlertMessage("Failed to refresh. Some files may have been moved or deleted.")

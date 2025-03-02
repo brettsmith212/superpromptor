@@ -1,6 +1,6 @@
 I have a web app idea I'd like to develop. Here's my initial concept:
 
-{{IDEA}}
+<superpromptor-input>
 
 I'm looking to collaborate with you to turn this into a detailed project request. Let's iterate together until we have a complete request that I find to be complete.
 

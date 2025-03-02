@@ -15,8 +15,8 @@ code {
   display: block;
   overflow-x: auto;
   padding: 0.5em;
-  color: #24292e;
-  background: #f6f8fa;
+  color: #ebf1f7;
+  background: #0d151d;
 }
 
 .dark .hljs {

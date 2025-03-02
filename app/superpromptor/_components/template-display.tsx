@@ -508,7 +508,7 @@ export default function TemplateDisplay({ starterTemplates }: { starterTemplates
                   <DropdownMenuItem
                     key={template}
                     onSelect={() => handleSelectTemplate(template)}
-                    className="hover:bg-gray-100 dark:hover:bg-gray-700 active:bg-gray-200 dark:active:bg-gray-600"
+                    className="px-2 py-1.5 text-sm hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-gray-600 dark:hover:text-gray-100 transition-colors focus:bg-gray-300 dark:focus:bg-gray-500 cursor-pointer"
                   >
                     {template}
                   </DropdownMenuItem>

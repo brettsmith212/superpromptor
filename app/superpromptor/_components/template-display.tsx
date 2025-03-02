@@ -1,28 +1,3 @@
-/**
- * @file Template Display component for SuperPromptor
- * @description
- * This client-side component manages the upload, markdown rendering, file selection,
- * and template management workflow for the SuperPromptor application. It allows users
- * to upload a .md template, parses it into segments with `<superpromptor-file>` tags replaced by
- * FileSelector components, renders the result, and provides "Refresh", "Remove", and "Copy Contents To Clipboard"
- * buttons to manage the template and generate the final output. State is managed using useReducer for scalability.
- *
- * Key features:
- * - Uploads .md templates using showOpenFilePicker or <input type="file"> fallback
- * - Parses template to replace exact `<superpromptor-file>` tags with FileSelector components
- * - Renders markdown segments with file selection buttons, ensuring content after FileSelector starts on a new line
- * - Tracks selected files and their handles per `<superpromptor-file>` tag in a Map using a reducer
- * - Provides "Refresh" button to reload the template and all selected file contents from the filesystem
- * - Provides "Remove" button to reset the app state with a "Template Removed" alert
- * - Provides "Copy Contents To Clipboard" button to generate and copy the combined output
- * - Displays a disappearing alert for user feedback (e.g., "Template Refreshed", "Template Removed", "Copied to clipboard")
- * - Handles errors for non-.md uploads, file access issues, and clipboard operations
- * - Silently ignores AbortError for user cancellations
- * - Alert animations require AnimatePresence in the parent component
- * - Refreshing updates both template and file contents, preserving file selections
- * - Files selected via fallback (<input>) cannot be refreshed due to lack of handles
- */
-
 "use client"
 
 import React, { useState, useCallback, useRef, useReducer, useMemo } from "react"
@@ -37,17 +12,15 @@ import Alert from "@/components/alert"
 import { encodingForModel } from 'js-tiktoken'
 import { TemplateEditorMarkdown } from "../_lib/instructions"
 import { Button } from "@/components/ui/button"
+import { ChevronDown } from 'lucide-react'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 
-/**
- * Represents a segment of the template: either markdown text or a FileSelector component.
- */
 interface Segment {
   type: "markdown" | "fileSelector"
-  content?: string // For markdown segments
-  id?: string     // For fileSelector segments
+  content?: string
+  id?: string
 }
 
-// Reducer types and functions
 type Action =
   | { type: "SET_SEGMENTS"; payload: Segment[] }
   | { type: "SET_FILES"; payload: { tagId: string; files: FileDataWithHandle[] } }
@@ -64,12 +37,6 @@ const initialState: State = {
   files: new Map(),
 }
 
-/**
- * Reducer function to manage template segments and file selections.
- * @param state - Current state of segments and files
- * @param action - Action to perform on the state
- * @returns New state based on the action
- */
 function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "SET_SEGMENTS":
@@ -87,11 +54,6 @@ function reducer(state: State, action: Action): State {
   }
 }
 
-/**
- * Helper function to read file contents as text
- * @param file - File object to read
- * @returns Promise resolving to the file contents as a string
- */
 async function readFileContents(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader()
@@ -108,7 +70,7 @@ async function readFileContents(file: File): Promise<string> {
   })
 }
 
-export default function TemplateDisplay() {
+export default function TemplateDisplay({ starterTemplates }: { starterTemplates: string[] }) {
   const [state, dispatch] = useReducer(reducer, initialState)
   const [templateHandle, setTemplateHandle] = useState<FileSystemFileHandle | null>(null)
   const [alertMessage, setAlertMessage] = useState<string | null>(null)
@@ -137,11 +99,6 @@ export default function TemplateDisplay() {
     return count
   }, [state.segments, state.files, encoding])
 
-  /**
-   * Parses the template content into segments of markdown and file selectors.
-   * @param content - The raw markdown template content
-   * @returns Array of Segment objects
-   */
   const parseTemplate = (content: string): Segment[] => {
     const regex = /<superpromptor-file>/g
     const newSegments: Segment[] = []
@@ -175,12 +132,6 @@ export default function TemplateDisplay() {
     return newSegments
   }
 
-  /**
-   * Handles file selection from a FileSelector instance.
-   * Updates the files Map with the selected files and handles for the given tag ID.
-   * @param tagId - The unique ID of the `<superpromptor-file>` tag
-   * @param selectedFiles - Array of selected FileDataWithHandle objects
-   */
   const handleFilesSelected = useCallback(
     (tagId: string, selectedFiles: FileDataWithHandle[]) => {
       dispatch({
@@ -191,20 +142,11 @@ export default function TemplateDisplay() {
     []
   )
 
-  /**
-   * Creates a memoized file selection handler for a specific tag ID.
-   * @param tagId - The unique ID of the file tag
-   * @returns Function to handle file selections for this tag
-   */
   const createFileSelectionHandler = useCallback(
     (tagId: string) => (files: FileDataWithHandle[]) => handleFilesSelected(tagId, files),
     [handleFilesSelected]
   )
 
-  /**
-   * Handles template upload using showOpenFilePicker if available, or triggers file input.
-   * Silently ignores AbortError if the user cancels the file picker.
-   */
   const handleUpload = async () => {
     if (window.showOpenFilePicker) {
       try {
@@ -244,13 +186,9 @@ export default function TemplateDisplay() {
     }
   }
 
-  /**
-   * Handles file input change for browsers without showOpenFilePicker support.
-   * @param event - The change event from the file input
-   */
   const handleFileInputChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file) return // User canceled the file input
+    if (!file) return
 
     if (!file.name.endsWith(".md")) {
       setAlertMessage("Please upload a .md file")
@@ -275,10 +213,6 @@ export default function TemplateDisplay() {
     reader.readAsText(file)
   }
 
-  /**
-   * Handles the Refresh button click to reload the template and all selected file contents from the filesystem.
-   * Preserves the file selections while updating their contents if handles are available.
-   */
   const handleRefresh = async () => {
     if (!templateHandle) {
       setAlertMessage("Please re-upload the template to refresh.")
@@ -286,12 +220,10 @@ export default function TemplateDisplay() {
       return
     }
     try {
-      // Refresh the template
       const templateFile = await templateHandle.getFile()
       const templateContent = await templateFile.text()
       const newSegments = parseTemplate(templateContent)
 
-      // Refresh all selected file contents
       const updatedFiles = new Map<string, FileDataWithHandle[]>()
       for (const [tagId, files] of state.files) {
         const refreshedFiles = await Promise.all(
@@ -305,16 +237,15 @@ export default function TemplateDisplay() {
                 console.error(`Error refreshing file ${fileData.path}:`, error)
                 setAlertMessage(`Failed to refresh file: ${fileData.path}`)
                 setAlertType("error")
-                return fileData // Keep old data if refresh fails
+                return fileData
               }
             }
-            return fileData // No handle, keep as-is
+            return fileData
           })
         )
         updatedFiles.set(tagId, refreshedFiles)
       }
 
-      // Update state with refreshed template and files
       dispatch({ type: "SET_SEGMENTS", payload: newSegments })
       for (const [tagId, files] of updatedFiles) {
         dispatch({ type: "SET_FILES", payload: { tagId, files } })
@@ -329,9 +260,6 @@ export default function TemplateDisplay() {
     }
   }
 
-  /**
-   * Handles the Remove button click to reset the app state.
-   */
   const handleRemove = () => {
     dispatch({ type: "RESET_STATE" })
     setTemplateHandle(null)
@@ -339,11 +267,6 @@ export default function TemplateDisplay() {
     setAlertType("info")
   }
 
-  /**
-   * Handles the Copy Contents To Clipboard button click.
-   * Generates the output by combining the template and selected file contents,
-   * then copies it to the clipboard.
-   */
   const handleCopy = async () => {
     const outputParts = state.segments.map((segment) => {
       if (segment.type === "markdown") {
@@ -365,10 +288,26 @@ export default function TemplateDisplay() {
     }
   }
 
-  /**
-   * Renders the parsed segments as markdown and FileSelector components.
-   * @returns Array of rendered elements
-   */
+  const handleSelectTemplate = async (templateName: string) => {
+    try {
+      const response = await fetch(`/api/templates/${templateName}`)
+      if (!response.ok) {
+        throw new Error('Failed to fetch template')
+      }
+      const content = await response.text()
+      const newSegments = parseTemplate(content)
+      dispatch({ type: "SET_SEGMENTS", payload: newSegments })
+      dispatch({ type: "CLEAR_FILES" })
+      setTemplateHandle(null)
+      setAlertMessage(`Loaded starter template: ${templateName}`)
+      setAlertType("info")
+    } catch (error) {
+      console.error('Error loading starter template:', error)
+      setAlertMessage('Failed to load starter template')
+      setAlertType("error")
+    }
+  }
+
   const renderTemplate = useCallback(() => {
     return state.segments.map((segment, index) => {
       if (segment.type === "markdown") {
@@ -416,7 +355,7 @@ export default function TemplateDisplay() {
               </button>
               <button
                 onClick={handleRefresh}
-                className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600"
+                className="px-2 py-1 bg-green-500 text-white rounded hover:bg-blue-600"
               >
                 Refresh
               </button>
@@ -442,12 +381,28 @@ export default function TemplateDisplay() {
         </div>
       ) : (
         <div className="flex flex-col gap-4">
-          <button
-            onClick={handleUpload}
-            className="w-fit px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            Upload Template
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleUpload}
+              className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            >
+              Upload Template
+            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="text-blue-500 border-gray-300">
+                  Starter Templates <ChevronDown className="ml-2 h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                {starterTemplates.map((template) => (
+                  <DropdownMenuItem key={template} onSelect={() => handleSelectTemplate(template)}>
+                    {template}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
           <div>
             <Button
               variant="outline"

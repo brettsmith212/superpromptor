@@ -574,7 +574,7 @@ export default function TemplateDisplay({ starterTemplates }: { starterTemplates
               className="w-fit flex justify-start items-center"
             >
               <span className="mr-2">{isInstructionsOpen ? "▼" : "▶"}</span>
-              How to Use Template Prompt Editor
+              How to Use Prompt Template Editor
             </Button>
             {isInstructionsOpen && (
               <div className="mt-2 p-4 bg-gray-100 dark:bg-gray-800 rounded">

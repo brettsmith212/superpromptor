@@ -6,7 +6,7 @@
  * It ensures that updates to instructions propagate consistently.
  *
  * Key features:
- * - Exports TemplateEditorMarkdown for the Template Prompt Editor tab
+ * - Exports TemplateEditorMarkdown for the Prompt Template Editor tab
  * - Exports XMLParserMarkdown for the XML Code Parser tab
  *
  * @notes

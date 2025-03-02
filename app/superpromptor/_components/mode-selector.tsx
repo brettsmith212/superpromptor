@@ -14,7 +14,7 @@ export default function ModeSelector({ starterTemplates }: { starterTemplates: s
       <Tabs value={mode} onValueChange={setMode} className="w-full">
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="template" className={triggerClassName}>
-            Template Prompt Editor
+            Prompt Template Editor
           </TabsTrigger>
           <TabsTrigger value="xml" className={triggerClassName}>
             XML Code Parser

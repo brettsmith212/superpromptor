@@ -39,6 +39,9 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "SuperPromptor",
   description: "A tool to streamline prompt creation for LLM chatboxes",
+  icons: {
+    icon: "/favicon.svg",
+  },
 }
 
 export default async function RootLayout({

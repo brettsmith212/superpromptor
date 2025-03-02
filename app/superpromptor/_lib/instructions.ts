@@ -15,14 +15,14 @@
  */
 
 export const TemplateEditorMarkdown = `
-SuperPromptor is a tool designed to help you create prompts for large language models (LLMs) by combining a markdown template with file contents.
+SuperPromptor is a tool designed to help you create prompts for large language models (LLMs) by combining a markdown template with file contents and user inputs.
 
 ## Steps to Use SuperPromptor
 
 1. **Upload a Markdown Template**
    - Click on the "Upload Template" button on the main page.
    - Select a \`.md\` file from your local file system.
-   - The markdown template should contain \`<superpromptor-file>\` tags where you want to insert file contents.
+   - The markdown template can contain \`<superpromptor-file>\` tags where you want to insert file contents and \`<superpromptor-input>\` tags where you want to insert user-provided text.
 
 2. **Select Files or Folders**
    - For each \`<superpromptor-file>\` tag in your markdown template, a "Select Files" button will appear.
@@ -30,14 +30,18 @@ SuperPromptor is a tool designed to help you create prompts for large language m
    - You can select multiple files or an entire folder.
    - If you select a folder, a tree view will allow you to choose specific files or subfolders.
 
-3. **Review and Adjust Selections**
+3. **Enter Text for Inputs**
+   - For each \`<superpromptor-input>\` tag, an input box will appear where you can enter free-form text.
+   - The input box is resizable and will wrap text to avoid horizontal scrolling.
+
+4. **Review and Adjust Selections**
    - Below each "Select Files" button, you'll see a list of selected files with their relative paths and sizes.
    - You can remove individual files by clicking the remove button next to each file.
    - Use the plus sign to add more files if needed.
 
-4. **Copy the Output**
-   - Once you've selected all necessary files, click the "Copy Contents To Clipboard" button.
-   - This will combine the template with the selected file contents and copy the result to your clipboard.
+5. **Copy the Output**
+   - Once you've selected all necessary files and entered text in the input boxes, click the "Copy Contents To Clipboard" button.
+   - This will combine the template with the selected file contents and input text, then copy the result to your clipboard.
    - You can then paste this into your LLM chatbox.
 
 ## Additional Features
@@ -50,6 +54,7 @@ SuperPromptor is a tool designed to help you create prompts for large language m
 - Only \`.md\` files are supported for templates.
 - Files larger than 10MB will trigger a warning; you can choose to include or exclude them.
 - The output format for each file is: \`-- relative/path/filename --\\n[file contents]\\n\`
+- For \`<superpromptor-input>\` tags, the text you enter will be included directly in the output where the tag is placed.
 `
 
 export const XMLParserMarkdown = `

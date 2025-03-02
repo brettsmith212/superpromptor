@@ -3,15 +3,15 @@
  * @description
  * This client-side component manages the upload, markdown rendering, file selection,
  * and template management workflow for the SuperPromptor application. It allows users
- * to upload a .md template, parses it into segments with `<superpromptor-file>` tags replaced by
- * FileSelector components, renders the result, and provides "Refresh", "Remove", and "Copy Contents To Clipboard"
+ * to upload a .md template, parses it into segments with `<superpromptor-file>` and `<superpromptor-input>` tags replaced by
+ * FileSelector and Textarea components, renders the result, and provides "Refresh", "Remove", and "Copy Contents To Clipboard"
  * buttons to manage the template and generate the final output. State is managed using useReducer for scalability.
  *
  * Key features:
  * - Uploads .md templates using showOpenFilePicker or <input type="file"> fallback
- * - Parses template to replace exact `<superpromptor-file>` tags with FileSelector components
- * - Renders markdown segments with file selection buttons, ensuring content after FileSelector starts on a new line
- * - Tracks selected files and their handles per `<superpromptor-file>` tag in a Map using a reducer
+ * - Parses template to replace exact `<superpromptor-file>` and `<superpromptor-input>` tags with FileSelector and Textarea components
+ * - Renders markdown segments with file selection buttons and input boxes, ensuring content after components starts on a new line
+ * - Tracks selected files and their handles per `<superpromptor-file>` tag and input values per `<superpromptor-input>` tag in Maps using a reducer
  * - Provides "Refresh" button to reload the template and all selected file contents from the filesystem
  * - Provides "Remove" button to reset the app state with a "Template Removed" alert
  * - Provides "Copy Contents To Clipboard" button to generate and copy the combined output
@@ -39,15 +39,15 @@ import { TemplateEditorMarkdown } from "../_lib/instructions"
 import { Button } from "@/components/ui/button"
 import { ChevronDown } from 'lucide-react'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
+import { Textarea } from "@/components/ui/textarea"
 
 /**
- * Represents a segment of the template: either markdown text or a FileSelector component.
+ * Represents a segment of the template: either markdown text, a FileSelector component, or an input box.
  */
-interface Segment {
-  type: "markdown" | "fileSelector"
-  content?: string // For markdown segments
-  id?: string     // For fileSelector segments
-}
+type Segment =
+  | { type: "markdown"; content: string }
+  | { type: "fileSelector"; id: string }
+  | { type: "input"; id: string }
 
 // Reducer types and functions
 type Action =
@@ -55,20 +55,24 @@ type Action =
   | { type: "SET_FILES"; payload: { tagId: string; files: FileDataWithHandle[] } }
   | { type: "CLEAR_FILES" }
   | { type: "RESET_STATE" }
+  | { type: "SET_INPUT_VALUE"; payload: { inputId: string; value: string } }
+  | { type: "CLEAR_INPUTS" }
 
 interface State {
   segments: Segment[]
   files: Map<string, FileDataWithHandle[]>
+  inputs: Map<string, string>
 }
 
 const initialState: State = {
   segments: [],
   files: new Map(),
+  inputs: new Map(),
 }
 
 /**
- * Reducer function to manage template segments and file selections.
- * @param state - Current state of segments and files
+ * Reducer function to manage template segments, file selections, and input values.
+ * @param state - Current state of segments, files, and inputs
  * @param action - Action to perform on the state
  * @returns New state based on the action
  */
@@ -84,6 +88,13 @@ function reducer(state: State, action: Action): State {
       return { ...state, files: new Map() }
     case "RESET_STATE":
       return initialState
+    case "SET_INPUT_VALUE":
+      const { inputId, value } = action.payload
+      const newInputs = new Map(state.inputs)
+      newInputs.set(inputId, value)
+      return { ...state, inputs: newInputs }
+    case "CLEAR_INPUTS":
+      return { ...state, inputs: new Map() }
     default:
       return state
   }
@@ -125,28 +136,32 @@ export default function TemplateDisplay({ starterTemplates }: { starterTemplates
     let count = 0
     state.segments.forEach((segment) => {
       if (segment.type === 'markdown') {
-        const tokens = encoding.encode(segment.content || '')
+        const tokens = encoding.encode(segment.content)
         count += tokens.length
-      } else {
-        const selectedFiles = state.files.get(segment.id!) || []
+      } else if (segment.type === 'fileSelector') {
+        const selectedFiles = state.files.get(segment.id) || []
         selectedFiles.forEach((file) => {
           const header = `-- ${file.path} --\n`
           const fileText = header + (file.contents || '') + '\n'
           const fileTokens = encoding.encode(fileText)
           count += fileTokens.length
         })
+      } else if (segment.type === 'input') {
+        const inputValue = state.inputs.get(segment.id) || ''
+        const tokens = encoding.encode(inputValue)
+        count += tokens.length
       }
     })
     return count
-  }, [state.segments, state.files, encoding])
+  }, [state.segments, state.files, state.inputs, encoding])
 
   /**
-   * Parses the template content into segments of markdown and file selectors.
+   * Parses the template content into segments of markdown, file selectors, or inputs.
    * @param content - The raw markdown template content
    * @returns Array of Segment objects
    */
   const parseTemplate = (content: string): Segment[] => {
-    const regex = /<superpromptor-file>/g
+    const regex = /<(superpromptor-file|superpromptor-input)>/g
     const newSegments: Segment[] = []
     let lastIndex = 0
     let counter = 0
@@ -159,9 +174,11 @@ export default function TemplateDisplay({ starterTemplates }: { starterTemplates
           content: content.slice(lastIndex, match.index),
         })
       }
-      const id = `file-${counter}`
+      const tagType = match[1] // "superpromptor-file" or "superpromptor-input"
+      const segmentType = tagType === "superpromptor-file" ? "fileSelector" : "input"
+      const id = `${segmentType === "fileSelector" ? "file" : "input"}-${counter}`
       newSegments.push({
-        type: "fileSelector",
+        type: segmentType,
         id,
       })
       counter++
@@ -233,6 +250,7 @@ export default function TemplateDisplay({ starterTemplates }: { starterTemplates
         const newSegments = parseTemplate(content)
         dispatch({ type: "SET_SEGMENTS", payload: newSegments })
         dispatch({ type: "CLEAR_FILES" })
+        dispatch({ type: "CLEAR_INPUTS" })
         setTemplateHandle(handle)
       } catch (error: unknown) {
         if (error instanceof DOMException && error.name === "AbortError") {
@@ -268,6 +286,7 @@ export default function TemplateDisplay({ starterTemplates }: { starterTemplates
       const newSegments = parseTemplate(content)
       dispatch({ type: "SET_SEGMENTS", payload: newSegments })
       dispatch({ type: "CLEAR_FILES" })
+      dispatch({ type: "CLEAR_INPUTS" })
       setTemplateHandle(null)
     }
     reader.onerror = () => {
@@ -322,6 +341,7 @@ export default function TemplateDisplay({ starterTemplates }: { starterTemplates
       for (const [tagId, files] of updatedFiles) {
         dispatch({ type: "SET_FILES", payload: { tagId, files } })
       }
+      dispatch({ type: "CLEAR_INPUTS" })
 
       setAlertMessage("Template and files refreshed")
       setAlertType("info")
@@ -344,16 +364,18 @@ export default function TemplateDisplay({ starterTemplates }: { starterTemplates
 
   /**
    * Handles the Copy Contents To Clipboard button click.
-   * Generates the output by combining the template and selected file contents,
+   * Generates the output by combining the template, selected file contents, and input values,
    * then copies it to the clipboard.
    */
   const handleCopy = async () => {
     const outputParts = state.segments.map((segment) => {
       if (segment.type === "markdown") {
         return segment.content
-      } else {
-        const selectedFiles = state.files.get(segment.id!) || []
+      } else if (segment.type === "fileSelector") {
+        const selectedFiles = state.files.get(segment.id) || []
         return selectedFiles.map((file) => `-- ${file.path} --\n${file.contents}\n`).join("")
+      } else if (segment.type === "input") {
+        return state.inputs.get(segment.id) || ''
       }
     })
     const output = outputParts.join("")
@@ -383,6 +405,7 @@ export default function TemplateDisplay({ starterTemplates }: { starterTemplates
       const newSegments = parseTemplate(content)
       dispatch({ type: "SET_SEGMENTS", payload: newSegments })
       dispatch({ type: "CLEAR_FILES" })
+      dispatch({ type: "CLEAR_INPUTS" })
       setTemplateHandle(null)
       setAlertMessage(`Loaded starter template: ${templateName}`)
       setAlertType("info")
@@ -396,7 +419,7 @@ export default function TemplateDisplay({ starterTemplates }: { starterTemplates
   }
 
   /**
-   * Renders the parsed segments as markdown and FileSelector components.
+   * Renders the parsed segments as markdown, FileSelector components, or Textarea inputs.
    * @returns Array of rendered elements
    */
   const renderTemplate = useCallback(() => {
@@ -409,22 +432,35 @@ export default function TemplateDisplay({ starterTemplates }: { starterTemplates
               rehypePlugins={[rehypeHighlight, rehypeRaw]}
               remarkPlugins={[remarkGfm]}
             >
-              {segment.content!}
+              {segment.content}
             </ReactMarkdown>
           </div>
         )
+      } else if (segment.type === "fileSelector") {
+        const onFilesSelected = createFileSelectionHandler(segment.id)
+        return (
+          <div key={segment.id} className="block">
+            <FileSelector
+              id={segment.id}
+              onFilesSelected={onFilesSelected}
+            />
+          </div>
+        )
+      } else if (segment.type === "input") {
+        const value = state.inputs.get(segment.id) || ''
+        return (
+          <div key={segment.id} className="markdown-container">
+            <Textarea
+              value={value}
+              onChange={(e) => dispatch({ type: "SET_INPUT_VALUE", payload: { inputId: segment.id, value: e.target.value } })}
+              className="w-full resize-y"
+              placeholder="Enter your text here"
+            />
+          </div>
+        )
       }
-      const onFilesSelected = createFileSelectionHandler(segment.id!)
-      return (
-        <div key={segment.id} className="block">
-          <FileSelector
-            id={segment.id!}
-            onFilesSelected={onFilesSelected}
-          />
-        </div>
-      )
     })
-  }, [state.segments, createFileSelectionHandler])
+  }, [state.segments, state.inputs, createFileSelectionHandler, dispatch])
 
   return (
     <div className="p-4">

@@ -13,12 +13,15 @@
  * - Assumes templates are stored with `.md` extension
  * - Uses synchronous file reading for simplicity
  */
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import fs from 'fs'
 import path from 'path'
 
-export async function GET(request: Request, { params }: { params: { name: string } }) {
-  const { name } = params
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ name: string }> }
+) {
+  const name = (await params).name
   const templatesDir = path.join(process.cwd(), 'starter-templates')
   const filePath = path.join(templatesDir, `${name}.md`)
 
@@ -27,7 +30,7 @@ export async function GET(request: Request, { params }: { params: { name: string
     return new NextResponse(content, {
       headers: { 'Content-Type': 'text/plain' },
     })
-  } catch (error) {
+  } catch {
     return new NextResponse('Template not found', { status: 404 })
   }
 }

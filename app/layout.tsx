@@ -3,7 +3,7 @@
  * @description
  * This server-side layout component serves as the top-level wrapper for all pages
  * in the SuperPromptor application. It sets up the HTML structure, applies global
- * fonts, includes a horizontal navigation bar, and renders child components, 
+ * fonts, includes a horizontal navigation bar, and renders child components,
  * fulfilling the layout requirements from the technical specification with a revised design.
  *
  * Key features:
@@ -27,14 +27,10 @@
  */
 
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
+import "@/public/inter.css" // Import local Inter font CSS from public/
 import "./globals.css"
 import "./styles/highlight.css"
 import NavigationPanel from "@/components/navigation-panel"
-
-const inter = Inter({
-  subsets: ["latin"],
-})
 
 export const metadata: Metadata = {
   title: "SuperPromptor",
@@ -51,7 +47,7 @@ export default async function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className={inter.className}>
+      <body style={{ fontFamily: 'Inter, sans-serif' }}>
         <div className="min-h-screen flex flex-col">
           {/* Horizontal navigation bar */}
           <NavigationPanel />

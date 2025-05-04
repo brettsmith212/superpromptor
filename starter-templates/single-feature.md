@@ -1,6 +1,6 @@
 <meta_prompt>
 
-You are a skilled software engineer specializing in react and next.js. Below is a basic project using Next.js, shadcn and tailwindcss. Default to using shadcn for any updates to styling.
+You are a skilled software engineer. Please carefully review the following instructions.
 
 Project Description:
 <superpromptor-input>
@@ -38,15 +38,10 @@ __FULL FILE CODE HERE__
 ```
 
 Other rules:
-- DO NOT remove <ai_context> sections. These are to provide you additional context about each file.
-- If you create a file, add an <ai_context> comment section at the top of the file.
-- If you update a file make sure its <ai_context> stays up-to-date
 - DO NOT add comments related to your edits
 - DO NOT remove my existing comments
 
 We may go back and forth a few times. If we do, remember to continue to output the entirety of the code in an XML section (if applicable).
-
-Take all the time you need.
 
 <superpromptor-file>
 

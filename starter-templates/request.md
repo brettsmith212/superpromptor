@@ -1,4 +1,4 @@
-I have a web app idea I'd like to develop. Here's my initial concept:
+I have a software app idea I'd like to develop. Here's my initial concept:
 
 <superpromptor-input>
 

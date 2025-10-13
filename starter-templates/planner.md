@@ -46,7 +46,7 @@ Present your plan using the following markdown-based format. This format is spec
   - **Files**: [Maximum of 10 files, ideally less]
     - `path/to/file1.ts`: [Description of changes]
   - **Step Dependencies**: [Step Dependencies]
-  - **User Instructions**: [Instructions for User]
+  - **Agent Instructions**: [Instructions for Agent]
 
 [Additional steps...]
 ```

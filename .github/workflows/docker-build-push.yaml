@@ -3,8 +3,6 @@ name: Docker Build, Push, and Deploy
 on:
   push:
     branches: [main]
-  pull_request:
-    branches: [main]
   workflow_dispatch:
 
 env:
@@ -24,7 +22,7 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GHCR_PAT_SUPERPROMPTOR }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
@@ -34,18 +32,6 @@ jobs:
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           platforms: linux/amd64
 
-      - name: Deploy to DigitalOcean
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          DO_HOST: ${{ secrets.DO_HOST }}
-          DO_USERNAME: ${{ secrets.DO_USERNAME }}
-          GHCR_PAT_SUPERPROMPTOR: ${{ secrets.GHCR_PAT_SUPERPROMPTOR }}
+      - name: Trigger Dokploy Deployment
         run: |
-          echo "$SSH_PRIVATE_KEY" > private_key && chmod 600 private_key
-          ssh -o StrictHostKeyChecking=no -i private_key ${DO_USERNAME}@${DO_HOST} <<EOF
-            echo "$GHCR_PAT_SUPERPROMPTOR" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
-            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-            docker stop superpromptor || true
-            docker rm superpromptor || true
-            docker run -d -p 3001:3000 --name superpromptor --restart always ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
-          EOF
+          curl -X POST "${{ secrets.DOKPLOY_SUPERPROMPTOR_WEBHOOK_URL }}"

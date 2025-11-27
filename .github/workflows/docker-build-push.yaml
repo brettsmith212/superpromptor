@@ -31,10 +31,3 @@ jobs:
           push: true
           tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
           platforms: linux/amd64
-
-      - name: Trigger Dokploy Deployment
-        run: |
-          curl -X POST "${{ secrets.DOKPLOY_SUPERPROMPTOR_URL }}/api/application.deploy" \
-            -H "Authorization: Bearer ${{ secrets.DOKPLOY_SUPERPROMPTOR_API_KEY }}" \
-            -H "Content-Type: application/json" \
-            -d '{ "applicationId": "${{ secrets.DOKPLOY_SUPERPROMPTOR_APPLICATION_ID }}" }'

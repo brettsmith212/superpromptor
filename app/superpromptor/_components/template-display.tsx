@@ -559,7 +559,7 @@ export default function TemplateDisplay({
               onClick={handleUpload}
               className="bg-blue-500 text-white hover:bg-blue-600"
             >
-              Upload Template Hello
+              Upload Template
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
